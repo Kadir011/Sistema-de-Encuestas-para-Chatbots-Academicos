@@ -9,17 +9,13 @@ const { Pool } = pg;
 const pool = new Pool({
     user: process.env.DB_USERNAME || 'postgres',
     host: process.env.DB_HOST || 'localhost',
-    database: process.env.DB_DATABASE,
+    database: process.env.DB_DATABASE || 'postgres',
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT || 5432,
-    // Allow configuring pool size via env. If not provided, use a large default
-    // to avoid rejecting connections during development/testing (e.g., Postman).
-    // Note: PostgreSQL itself also has a `max_connections` server limit.
-    max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : 1000,
-    // Increase idle timeout to reduce churn during rapid requests
-    idleTimeoutMillis: process.env.DB_IDLE_TIMEOUT ? parseInt(process.env.DB_IDLE_TIMEOUT, 10) : 300000,
-    // Set connection timeout to 0 (no timeout) while testing; can be tuned via env
-    connectionTimeoutMillis: process.env.DB_CONN_TIMEOUT ? parseInt(process.env.DB_CONN_TIMEOUT, 10) : 0,
+    max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : 10, // cambia 1000 → 10
+    idleTimeoutMillis: process.env.DB_IDLE_TIMEOUT ? parseInt(process.env.DB_IDLE_TIMEOUT, 10) : 30000,
+    connectionTimeoutMillis: process.env.DB_CONN_TIMEOUT ? parseInt(process.env.DB_CONN_TIMEOUT, 10) : 5000,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 
 // Manejo de errores del pool
