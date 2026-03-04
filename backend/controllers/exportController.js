@@ -118,7 +118,9 @@ export const exportTeacherSurveys = async (req, res) => {
             'Recomendaría': survey.would_recommend ? 'Sí' : 'No',
             'Rango de Edad': survey.age_range || 'N/A',
             'Tipo de Institución': survey.institution_type || 'N/A',
-            'País': survey.country || 'N/A',
+            'País': Array.isArray(survey.countries)
+                ? survey.countries.join(', ')
+                : survey.country || 'N/A',
             'Años de Experiencia': survey.years_experience || 'N/A',
             'Comentarios': survey.additional_comments || '',
             'Fecha de Creación': new Date(survey.created_at).toLocaleDateString('es-ES')
@@ -138,6 +140,13 @@ export const exportTeacherSurveys = async (req, res) => {
     }
 };
 
+// Helper: convierte cualquier valor a número de forma segura
+const toNum = (val, decimals = null) => {
+    const n = parseFloat(val ?? 0);
+    const result = Number.isFinite(n) ? n : 0;
+    return decimals !== null ? parseFloat(result.toFixed(decimals)) : result;
+};
+
 export const exportStatistics = async (req, res) => {
     try {
         const { type } = req.query; // 'student' o 'teacher'
@@ -145,32 +154,55 @@ export const exportStatistics = async (req, res) => {
         let statistics = {};
         
         if (type === 'student' || !type) {
-            const studentStats = await StudentSurvey.getStatistics();
-            const mostUsedChatbots = await StudentSurvey.getMostUsedChatbots();
-            const mostCommonTasks = await StudentSurvey.getMostCommonTasks();
+            const studentStats       = await StudentSurvey.getStatistics();
+            const mostUsedChatbots   = await StudentSurvey.getMostUsedChatbots();
+            const mostCommonTasks    = await StudentSurvey.getMostCommonTasks();
             const frequencyDistribution = await StudentSurvey.getUsageFrequencyDistribution();
             
+            // Normalizar campos numéricos que PostgreSQL devuelve como strings
+            const general = {
+                total_surveys:      parseInt(studentStats?.total_surveys      ?? 0) || 0,
+                avg_usefulness:     toNum(studentStats?.avg_usefulness,  2),
+                avg_experience:     toNum(studentStats?.avg_experience,  2),
+                users_with_chatbot: parseInt(studentStats?.users_with_chatbot ?? 0) || 0,
+                will_continue:      parseInt(studentStats?.will_continue      ?? 0) || 0,
+                would_recommend:    parseInt(studentStats?.would_recommend    ?? 0) || 0,
+                new_this_week:      parseInt(studentStats?.new_this_week      ?? 0) || 0,
+                new_this_month:     parseInt(studentStats?.new_this_month     ?? 0) || 0,
+            };
+
             statistics.student = {
-                general: studentStats,
+                general,
                 chatbots: mostUsedChatbots,
-                tasks: mostCommonTasks,
+                tasks:    mostCommonTasks,
                 frequency: frequencyDistribution
             };
         }
         
         if (type === 'teacher' || !type) {
-            const teacherStats = await TeacherSurvey.getStatistics();
-            const countryDist = await TeacherSurvey.getCountryDistribution();
-            const institutionDist = await TeacherSurvey.getInstitutionDistribution();
-            const commonPurposes = await TeacherSurvey.getMostCommonPurposes();
-            const commonChallenges = await TeacherSurvey.getMostCommonChallenges();
+            const teacherStats      = await TeacherSurvey.getStatistics();
+            const countryDist       = await TeacherSurvey.getCountryDistribution();
+            const institutionDist   = await TeacherSurvey.getInstitutionDistribution();
+            const commonPurposes    = await TeacherSurvey.getMostCommonPurposes();
+            const commonChallenges  = await TeacherSurvey.getMostCommonChallenges();
             
+            // Normalizar campos numéricos
+            const general = {
+                total_surveys:           parseInt(teacherStats?.total_surveys            ?? 0) || 0,
+                teachers_using_chatbots: parseInt(teacherStats?.teachers_using_chatbots  ?? 0) || 0,
+                very_likely_continue:    parseInt(teacherStats?.very_likely_continue     ?? 0) || 0,
+                likely_continue:         parseInt(teacherStats?.likely_continue          ?? 0) || 0,
+                unlikely_continue:       parseInt(teacherStats?.unlikely_continue        ?? 0) || 0,
+                new_this_week:           parseInt(teacherStats?.new_this_week            ?? 0) || 0,
+                new_this_month:          parseInt(teacherStats?.new_this_month           ?? 0) || 0,
+            };
+
             statistics.teacher = {
-                general: teacherStats,
-                countries: countryDist,
+                general,
+                countries:    countryDist,
                 institutions: institutionDist,
-                purposes: commonPurposes,
-                challenges: commonChallenges
+                purposes:     commonPurposes,
+                challenges:   commonChallenges
             };
         }
         
