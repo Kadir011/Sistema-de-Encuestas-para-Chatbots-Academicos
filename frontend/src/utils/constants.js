@@ -184,18 +184,3 @@ export const SUCCESS_MESSAGES = {
     SURVEY_DELETED: 'Encuesta eliminada exitosamente',
     PASSWORD_UPDATED: 'Contraseña actualizada exitosamente',
 };
-
-// Colores para Excel
-export const COLORS = {
-    primary: '1E40AF',
-    primaryLight: '3B82F6',
-    primaryBg: 'DBEAFE',
-    secondary: '059669',
-    secondaryLight: '10B981',
-    secondaryBg: 'D1FAE5',
-    headerBg: '1E3A8A',
-    headerText: 'FFFFFF',
-    border: 'E5E7EB',
-    text: '1F2937',
-    textLight: '6B7280',
-};
