@@ -35,7 +35,10 @@ class User {
     // Buscar usuario por email
     static async findByEmail(email) {
         try {
-            const text = 'SELECT * FROM users WHERE email = $1';
+            const text = `
+                SELECT id, username, email, password, role, created_at 
+                FROM users WHERE email = $1
+            `;
             const result = await query(text, [email]);
             return result.rows[0];
         } catch (error) {
@@ -61,7 +64,10 @@ class User {
     // Buscar usuario por username
     static async findByUsername(username) {
         try {
-            const text = 'SELECT * FROM users WHERE username = $1';
+            const text = `
+                SELECT id, username, email, password, role, created_at 
+                FROM users WHERE username = $1
+            `;
             const result = await query(text, [username]);
             return result.rows[0];
         } catch (error) {
