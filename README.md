@@ -1,5 +1,11 @@
 # ChatBots Education Survey Platform
 
+![React](https://img.shields.io/badge/React-19.2.0-blue?logo=react&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-22.17.0-green?logo=node.js&logoColor=white)
+![Express.js](https://img.shields.io/badge/Express.js-5.21-lightgrey?logo=express&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Ready-blue?logo=postgresql&logoColor=white)
+![License](https://img.shields.io/badge/License-Proprietary-red)
+
 Plataforma full-stack para recopilar y analizar datos sobre el uso de chatbots de IA en contextos educativos.
 
 ## Demo en Producción
