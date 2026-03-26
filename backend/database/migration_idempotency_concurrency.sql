@@ -18,7 +18,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS users_email_key
 CREATE UNIQUE INDEX IF NOT EXISTS users_username_key
     ON users (username);
 
-
 -- ──────────────────────────────────────────────────────────────
 -- 2. IDEMPOTENCIA DE ENCUESTAS DE ESTUDIANTES
 --    Restringe a una encuesta por usuario por día.
