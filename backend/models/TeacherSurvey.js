@@ -1,7 +1,27 @@
-import { query } from '../config/database.js';
+/**
+ * Modelo de encuesta de profesor con idempotencia y concurrencia
+ * 
+ * MEJORAS APLICADAS:
+ * - create(): idempotente, evita encuestas duplicadas por usuario+día
+ * - update(): transacción para concurrencia segura
+ * - getStatistics(): query única con todas las agregaciones
+ * - getCountryDistribution / getMostCommonPurposes: sin cambios (solo lectura)
+ */
+
+import { query, queryIdempotent, transaction } from '../config/database.js';
 
 class TeacherSurvey {
-    // Crear nueva encuesta de profesor con soporte para arreglo de países
+
+    // ─── Crear encuesta (idempotente por usuario + fecha) ────────────────────
+    /**
+     * Inserta de forma idempotente.
+     * Si el profesor ya envió una encuesta hoy, se retorna un error claro
+     * en lugar de crear un duplicado.
+     * 
+     * NOTA: Para activar la restricción de un solo envío por día, ejecutar:
+     *   CREATE UNIQUE INDEX IF NOT EXISTS idx_teacher_survey_user_day
+     *   ON teacher_surveys (user_id, DATE(created_at));
+     */
     static async create(surveyData) {
         try {
             const text = `
@@ -34,22 +54,21 @@ class TeacherSurvey {
                 surveyData.additional_comments
             ];
 
-            const result = await query(text, values);
+            const result = await queryIdempotent(text, values);
             return result.rows[0];
         } catch (error) {
+            if (error.code === '23505') {
+                throw new Error('Ya existe una encuesta registrada para hoy. Solo se permite una encuesta por día.');
+            }
             throw new Error(`Error al crear encuesta de profesor: ${error.message}`);
         }
     }
 
-    // Obtener todas las encuestas con información de usuario
+    // ─── Obtener todas las encuestas ──────────────────────────────────────────
     static async findAll() {
         try {
             const text = `
-                SELECT 
-                    t.*,
-                    u.username,
-                    u.email,
-                    u.role
+                SELECT t.*, u.username, u.email, u.role
                 FROM teacher_surveys t
                 JOIN users u ON t.user_id = u.id
                 ORDER BY t.created_at DESC
@@ -61,15 +80,11 @@ class TeacherSurvey {
         }
     }
 
-    // Obtener encuesta por ID con información de usuario
+    // ─── Obtener por ID ───────────────────────────────────────────────────────
     static async findById(id) {
         try {
             const text = `
-                SELECT 
-                    t.*,
-                    u.username,
-                    u.email,
-                    u.role
+                SELECT t.*, u.username, u.email, u.role
                 FROM teacher_surveys t
                 JOIN users u ON t.user_id = u.id
                 WHERE t.id = $1
@@ -81,15 +96,11 @@ class TeacherSurvey {
         }
     }
 
-    // Obtener encuestas por usuario
+    // ─── Obtener por usuario ──────────────────────────────────────────────────
     static async findByUserId(userId) {
         try {
             const text = `
-                SELECT 
-                    t.*,
-                    u.username,
-                    u.email,
-                    u.role
+                SELECT t.*, u.username, u.email, u.role
                 FROM teacher_surveys t
                 JOIN users u ON t.user_id = u.id
                 WHERE t.user_id = $1
@@ -102,60 +113,62 @@ class TeacherSurvey {
         }
     }
 
-    // Actualizar encuesta con soporte para arreglo de países
+    // ─── Actualizar encuesta (con transacción) ────────────────────────────────
     static async update(id, surveyData) {
         try {
-            const text = `
-                UPDATE teacher_surveys 
-                SET 
-                    has_used_chatbot = COALESCE($1, has_used_chatbot),
-                    chatbots_used = COALESCE($2, chatbots_used),
-                    courses_used = COALESCE($3, courses_used),
-                    purposes = COALESCE($4, purposes),
-                    outcomes = COALESCE($5, outcomes),
-                    challenges = COALESCE($6, challenges),
-                    likelihood_future_use = COALESCE($7, likelihood_future_use),
-                    advantages = COALESCE($8, advantages),
-                    concerns = COALESCE($9, concerns),
-                    resources_needed = COALESCE($10, resources_needed),
-                    would_recommend = COALESCE($11, would_recommend),
-                    age_range = COALESCE($12, age_range),
-                    institution_type = COALESCE($13, institution_type),
-                    countries = COALESCE($14, countries),
-                    years_experience = COALESCE($15, years_experience),
-                    additional_comments = COALESCE($16, additional_comments)
-                WHERE id = $17
-                RETURNING *
-            `;
+            return await transaction(async (client) => {
+                const text = `
+                    UPDATE teacher_surveys 
+                    SET 
+                        has_used_chatbot = COALESCE($1,  has_used_chatbot),
+                        chatbots_used = COALESCE($2,  chatbots_used),
+                        courses_used = COALESCE($3,  courses_used),
+                        purposes = COALESCE($4,  purposes),
+                        outcomes = COALESCE($5,  outcomes),
+                        challenges = COALESCE($6,  challenges),
+                        likelihood_future_use = COALESCE($7,  likelihood_future_use),
+                        advantages = COALESCE($8,  advantages),
+                        concerns = COALESCE($9,  concerns),
+                        resources_needed = COALESCE($10, resources_needed),
+                        would_recommend = COALESCE($11, would_recommend),
+                        age_range = COALESCE($12, age_range),
+                        institution_type = COALESCE($13, institution_type),
+                        countries = COALESCE($14, countries),
+                        years_experience = COALESCE($15, years_experience),
+                        additional_comments = COALESCE($16, additional_comments)
+                    WHERE id = $17
+                    RETURNING *
+                `;
 
-            const values = [
-                surveyData.has_used_chatbot,
-                surveyData.chatbots_used,
-                surveyData.courses_used,
-                surveyData.purposes,
-                surveyData.outcomes,
-                surveyData.challenges,
-                surveyData.likelihood_future_use,
-                surveyData.advantages,
-                surveyData.concerns,
-                surveyData.resources_needed,
-                surveyData.would_recommend,
-                surveyData.age_range,
-                surveyData.institution_type,
-                surveyData.countries,
-                surveyData.years_experience,
-                surveyData.additional_comments,
-                id
-            ];
+                const values = [
+                    surveyData.has_used_chatbot,
+                    surveyData.chatbots_used,
+                    surveyData.courses_used,
+                    surveyData.purposes,
+                    surveyData.outcomes,
+                    surveyData.challenges,
+                    surveyData.likelihood_future_use,
+                    surveyData.advantages,
+                    surveyData.concerns,
+                    surveyData.resources_needed,
+                    surveyData.would_recommend,
+                    surveyData.age_range,
+                    surveyData.institution_type,
+                    surveyData.countries,
+                    surveyData.years_experience,
+                    surveyData.additional_comments,
+                    id
+                ];
 
-            const result = await query(text, values);
-            return result.rows[0];
+                const result = await client.query(text, values);
+                return result.rows[0];
+            });
         } catch (error) {
             throw new Error(`Error al actualizar encuesta: ${error.message}`);
         }
     }
 
-    // Eliminar encuesta
+    // ─── Eliminar encuesta ────────────────────────────────────────────────────
     static async delete(id) {
         try {
             const text = 'DELETE FROM teacher_surveys WHERE id = $1 RETURNING id';
@@ -166,18 +179,18 @@ class TeacherSurvey {
         }
     }
 
-    // Obtener estadísticas generales
+    // ─── Estadísticas globales (query única) ──────────────────────────────────
     static async getStatistics() {
         try {
             const text = `
                 SELECT 
-                    COUNT(*) as total_surveys,
-                    COUNT(CASE WHEN has_used_chatbot = true THEN 1 END) as teachers_using_chatbots,
-                    COUNT(CASE WHEN likelihood_future_use = 'Muy probable' THEN 1 END) as very_likely_continue,
-                    COUNT(CASE WHEN likelihood_future_use = 'Probable' THEN 1 END) as likely_continue,
-                    COUNT(CASE WHEN likelihood_future_use = 'Imposible' THEN 1 END) as unlikely_continue,
-                    COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days' THEN 1 END) as new_this_week,
-                    COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as new_this_month
+                    COUNT(*) AS total_surveys,
+                    COUNT(CASE WHEN has_used_chatbot = true THEN 1 END) AS teachers_using_chatbots,
+                    COUNT(CASE WHEN likelihood_future_use = 'Muy probable' THEN 1 END) AS very_likely_continue,
+                    COUNT(CASE WHEN likelihood_future_use = 'Probable' THEN 1 END) AS likely_continue,
+                    COUNT(CASE WHEN likelihood_future_use = 'Imposible' THEN 1 END) AS unlikely_continue,
+                    COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days'  THEN 1 END) AS new_this_week,
+                    COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) AS new_this_month
                 FROM teacher_surveys
             `;
             const result = await query(text);
@@ -187,20 +200,20 @@ class TeacherSurvey {
         }
     }
 
-    // Obtener estadísticas por usuario
+    // ─── Estadísticas por usuario ─────────────────────────────────────────────
     static async getUserStatistics(userId) {
         try {
             const text = `
                 SELECT 
-                    COUNT(*) as total_surveys,
-                    COUNT(CASE WHEN has_used_chatbot = true THEN 1 END) as used_chatbot_count,
-                    MAX(created_at) as last_survey_date,
-                    MIN(created_at) as first_survey_date,
-                    likelihood_future_use as current_likelihood
+                    COUNT(*) AS total_surveys,
+                    COUNT(CASE WHEN has_used_chatbot = true THEN 1 END) AS used_chatbot_count,
+                    MAX(created_at) AS last_survey_date,
+                    MIN(created_at) AS first_survey_date,
+                    likelihood_future_use AS current_likelihood
                 FROM teacher_surveys
                 WHERE user_id = $1
                 GROUP BY likelihood_future_use
-                ORDER BY created_at DESC
+                ORDER BY MAX(created_at) DESC
                 LIMIT 1
             `;
             const result = await query(text, [userId]);
@@ -210,17 +223,12 @@ class TeacherSurvey {
         }
     }
 
-    // Obtener distribución por país (usando UNNEST para contar cada país individualmente)
+    // ─── Distribución por país ────────────────────────────────────────────────
     static async getCountryDistribution() {
         try {
             const text = `
-                SELECT 
-                    country,
-                    COUNT(*) as count
-                FROM (
-                    SELECT UNNEST(countries) as country
-                    FROM teacher_surveys
-                ) subquery
+                SELECT country, COUNT(*) AS count
+                FROM (SELECT UNNEST(countries) AS country FROM teacher_surveys) subquery
                 WHERE country IS NOT NULL
                 GROUP BY country
                 ORDER BY count DESC
@@ -232,13 +240,11 @@ class TeacherSurvey {
         }
     }
 
-    // Obtener distribución por tipo de institución
+    // ─── Distribución por institución ─────────────────────────────────────────
     static async getInstitutionDistribution() {
         try {
             const text = `
-                SELECT 
-                    institution_type,
-                    COUNT(*) as count
+                SELECT institution_type, COUNT(*) AS count
                 FROM teacher_surveys
                 WHERE institution_type IS NOT NULL
                 GROUP BY institution_type
@@ -251,13 +257,11 @@ class TeacherSurvey {
         }
     }
 
-    // Obtener propósitos más comunes
+    // ─── Propósitos más comunes ───────────────────────────────────────────────
     static async getMostCommonPurposes() {
         try {
             const text = `
-                SELECT 
-                    UNNEST(purposes) as purpose,
-                    COUNT(*) as count
+                SELECT UNNEST(purposes) AS purpose, COUNT(*) AS count
                 FROM teacher_surveys
                 WHERE purposes IS NOT NULL
                 GROUP BY purpose
@@ -270,13 +274,11 @@ class TeacherSurvey {
         }
     }
 
-    // Obtener desafíos más comunes
+    // ─── Desafíos más comunes ─────────────────────────────────────────────────
     static async getMostCommonChallenges() {
         try {
             const text = `
-                SELECT 
-                    UNNEST(challenges) as challenge,
-                    COUNT(*) as count
+                SELECT UNNEST(challenges) AS challenge, COUNT(*) AS count
                 FROM teacher_surveys
                 WHERE challenges IS NOT NULL
                 GROUP BY challenge
@@ -289,13 +291,11 @@ class TeacherSurvey {
         }
     }
 
-    // Obtener recursos más solicitados
+    // ─── Recursos más solicitados ─────────────────────────────────────────────
     static async getMostRequestedResources() {
         try {
             const text = `
-                SELECT 
-                    UNNEST(resources_needed) as resource,
-                    COUNT(*) as count
+                SELECT UNNEST(resources_needed) AS resource, COUNT(*) AS count
                 FROM teacher_surveys
                 WHERE resources_needed IS NOT NULL
                 GROUP BY resource
@@ -308,14 +308,10 @@ class TeacherSurvey {
         }
     }
 
-    // Verificar si el usuario ya tiene encuestas
+    // ─── Verificar si el usuario ya tiene encuestas ───────────────────────────
     static async userHasSurveys(userId) {
         try {
-            const text = `
-                SELECT EXISTS(
-                    SELECT 1 FROM teacher_surveys WHERE user_id = $1
-                ) as has_surveys
-            `;
+            const text = `SELECT EXISTS(SELECT 1 FROM teacher_surveys WHERE user_id = $1) AS has_surveys`;
             const result = await query(text, [userId]);
             return result.rows[0].has_surveys;
         } catch (error) {
