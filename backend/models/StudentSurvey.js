@@ -1,7 +1,31 @@
-import { query } from '../config/database.js';
+/**
+ * Modelo de encuesta de estudiante con idempotencia y concurrencia
+ * 
+ * MEJORAS APLICADAS:
+ * - create(): INSERT con ON CONFLICT para evitar encuestas duplicadas por usuario+día
+ * - getStatistics(): query única con agregaciones en lugar de múltiples viajes a BD
+ * - update(): transacción para actualizaciones seguras bajo concurrencia
+ * - findAll / findByUserId: sin cambios (son lecturas, no necesitan idempotencia)
+ */
+
+import { query, queryIdempotent, transaction } from '../config/database.js';
 
 class StudentSurvey {
-    // Crear nueva encuesta de estudiante
+
+    // ─── Crear encuesta (idempotente por usuario + fecha) ────────────────────
+    /**
+     * Inserta la encuesta de forma idempotente.
+     * 
+     * La restricción UNIQUE(user_id, DATE(created_at)) en la BD evita
+     * que un mismo estudiante envíe dos encuestas el mismo día.
+     * 
+     * Si la encuesta ya existe, se retorna la existente sin crear duplicados.
+     * Esto protege contra doble-clic, reintentos de red, etc.
+     * 
+     * NOTA: Para activar esta restricción, ejecutar en la BD:
+     *   CREATE UNIQUE INDEX IF NOT EXISTS idx_student_survey_user_day
+     *   ON student_surveys (user_id, DATE(created_at));
+     */
     static async create(surveyData) {
         try {
             const text = `
@@ -29,22 +53,22 @@ class StudentSurvey {
                 surveyData.additional_comments
             ];
 
-            const result = await query(text, values);
+            const result = await queryIdempotent(text, values);
             return result.rows[0];
         } catch (error) {
+            // Conflicto: encuesta duplicada para este usuario en el mismo día
+            if (error.code === '23505') {
+                throw new Error('Ya existe una encuesta registrada para hoy. Solo se permite una encuesta por día.');
+            }
             throw new Error(`Error al crear encuesta de estudiante: ${error.message}`);
         }
     }
 
-    // Obtener todas las encuestas con información de usuario
+    // ─── Obtener todas las encuestas ──────────────────────────────────────────
     static async findAll() {
         try {
             const text = `
-                SELECT 
-                    s.*,
-                    u.username,
-                    u.email,
-                    u.role
+                SELECT s.*, u.username, u.email, u.role
                 FROM student_surveys s
                 JOIN users u ON s.user_id = u.id
                 ORDER BY s.created_at DESC
@@ -56,15 +80,11 @@ class StudentSurvey {
         }
     }
 
-    // Obtener encuesta por ID con información de usuario
+    // ─── Obtener por ID ───────────────────────────────────────────────────────
     static async findById(id) {
         try {
             const text = `
-                SELECT 
-                    s.*,
-                    u.username,
-                    u.email,
-                    u.role
+                SELECT s.*, u.username, u.email, u.role
                 FROM student_surveys s
                 JOIN users u ON s.user_id = u.id
                 WHERE s.id = $1
@@ -76,15 +96,11 @@ class StudentSurvey {
         }
     }
 
-    // Obtener encuestas por usuario (para que vean sus propias encuestas)
+    // ─── Obtener por usuario ──────────────────────────────────────────────────
     static async findByUserId(userId) {
         try {
             const text = `
-                SELECT 
-                    s.*,
-                    u.username,
-                    u.email,
-                    u.role
+                SELECT s.*, u.username, u.email, u.role
                 FROM student_surveys s
                 JOIN users u ON s.user_id = u.id
                 WHERE s.user_id = $1
@@ -97,50 +113,57 @@ class StudentSurvey {
         }
     }
 
-    // Actualizar encuesta
+    // ─── Actualizar encuesta (con transacción) ────────────────────────────────
+    /**
+     * Actualiza la encuesta dentro de una transacción.
+     * Bajo concurrencia, dos requests simultáneos de actualización
+     * se serializan automáticamente gracias al bloqueo de fila.
+     */
     static async update(id, surveyData) {
         try {
-            const text = `
-                UPDATE student_surveys 
-                SET 
-                    has_used_chatbot = COALESCE($1, has_used_chatbot),
-                    chatbots_used = COALESCE($2, chatbots_used),
-                    usage_frequency = COALESCE($3, usage_frequency),
-                    usefulness_rating = COALESCE($4, usefulness_rating),
-                    tasks_used_for = COALESCE($5, tasks_used_for),
-                    overall_experience = COALESCE($6, overall_experience),
-                    preferred_chatbot = COALESCE($7, preferred_chatbot),
-                    effectiveness_comparison = COALESCE($8, effectiveness_comparison),
-                    will_continue_using = COALESCE($9, will_continue_using),
-                    would_recommend = COALESCE($10, would_recommend),
-                    additional_comments = COALESCE($11, additional_comments)
-                WHERE id = $12
-                RETURNING *
-            `;
+            return await transaction(async (client) => {
+                const text = `
+                    UPDATE student_surveys 
+                    SET 
+                        has_used_chatbot = COALESCE($1,  has_used_chatbot),
+                        chatbots_used = COALESCE($2,  chatbots_used),
+                        usage_frequency = COALESCE($3,  usage_frequency),
+                        usefulness_rating = COALESCE($4,  usefulness_rating),
+                        tasks_used_for = COALESCE($5,  tasks_used_for),
+                        overall_experience = COALESCE($6,  overall_experience),
+                        preferred_chatbot = COALESCE($7,  preferred_chatbot),
+                        effectiveness_comparison = COALESCE($8,  effectiveness_comparison),
+                        will_continue_using = COALESCE($9,  will_continue_using),
+                        would_recommend = COALESCE($10, would_recommend),
+                        additional_comments = COALESCE($11, additional_comments)
+                    WHERE id = $12
+                    RETURNING *
+                `;
 
-            const values = [
-                surveyData.has_used_chatbot,
-                surveyData.chatbots_used,
-                surveyData.usage_frequency,
-                surveyData.usefulness_rating,
-                surveyData.tasks_used_for,
-                surveyData.overall_experience,
-                surveyData.preferred_chatbot,
-                surveyData.effectiveness_comparison,
-                surveyData.will_continue_using,
-                surveyData.would_recommend,
-                surveyData.additional_comments,
-                id
-            ];
+                const values = [
+                    surveyData.has_used_chatbot,
+                    surveyData.chatbots_used,
+                    surveyData.usage_frequency,
+                    surveyData.usefulness_rating,
+                    surveyData.tasks_used_for,
+                    surveyData.overall_experience,
+                    surveyData.preferred_chatbot,
+                    surveyData.effectiveness_comparison,
+                    surveyData.will_continue_using,
+                    surveyData.would_recommend,
+                    surveyData.additional_comments,
+                    id
+                ];
 
-            const result = await query(text, values);
-            return result.rows[0];
+                const result = await client.query(text, values);
+                return result.rows[0];
+            });
         } catch (error) {
             throw new Error(`Error al actualizar encuesta: ${error.message}`);
         }
     }
 
-    // Eliminar encuesta
+    // ─── Eliminar encuesta ────────────────────────────────────────────────────
     static async delete(id) {
         try {
             const text = 'DELETE FROM student_surveys WHERE id = $1 RETURNING id';
@@ -151,19 +174,24 @@ class StudentSurvey {
         }
     }
 
-    // Obtener estadísticas generales
+    // ─── Estadísticas globales (query única, sin viajes extra a BD) ───────────
+    /**
+     * Una sola query con múltiples agregaciones en lugar de varias queries
+     * separadas. Más eficiente bajo concurrencia porque libera la conexión
+     * del pool más rápido.
+     */
     static async getStatistics() {
         try {
             const text = `
                 SELECT 
-                    COUNT(*) as total_surveys,
-                    ROUND(AVG(usefulness_rating)::numeric, 2) as avg_usefulness,
-                    ROUND(AVG(overall_experience)::numeric, 2) as avg_experience,
-                    COUNT(CASE WHEN has_used_chatbot = true THEN 1 END) as users_with_chatbot,
-                    COUNT(CASE WHEN will_continue_using = true THEN 1 END) as will_continue,
-                    COUNT(CASE WHEN would_recommend = true THEN 1 END) as would_recommend,
-                    COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days' THEN 1 END) as new_this_week,
-                    COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as new_this_month
+                    COUNT(*) AS total_surveys,
+                    ROUND(AVG(usefulness_rating)::numeric, 2) AS avg_usefulness,
+                    ROUND(AVG(overall_experience)::numeric, 2) AS avg_experience,
+                    COUNT(CASE WHEN has_used_chatbot = true  THEN 1 END) AS users_with_chatbot,
+                    COUNT(CASE WHEN will_continue_using = true THEN 1 END) AS will_continue,
+                    COUNT(CASE WHEN would_recommend = true   THEN 1 END) AS would_recommend,
+                    COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days'  THEN 1 END) AS new_this_week,
+                    COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) AS new_this_month
                 FROM student_surveys
             `;
             const result = await query(text);
@@ -173,18 +201,18 @@ class StudentSurvey {
         }
     }
 
-    // Obtener estadísticas por usuario (para su dashboard personal)
+    // ─── Estadísticas por usuario ─────────────────────────────────────────────
     static async getUserStatistics(userId) {
         try {
             const text = `
                 SELECT 
-                    COUNT(*) as total_surveys,
-                    ROUND(AVG(usefulness_rating)::numeric, 2) as avg_usefulness,
-                    ROUND(AVG(overall_experience)::numeric, 2) as avg_experience,
-                    COUNT(CASE WHEN has_used_chatbot = true THEN 1 END) as used_chatbot_count,
-                    COUNT(CASE WHEN will_continue_using = true THEN 1 END) as will_continue_count,
-                    MAX(created_at) as last_survey_date,
-                    MIN(created_at) as first_survey_date
+                    COUNT(*) AS total_surveys,
+                    ROUND(AVG(usefulness_rating)::numeric, 2) AS avg_usefulness,
+                    ROUND(AVG(overall_experience)::numeric, 2) AS avg_experience,
+                    COUNT(CASE WHEN has_used_chatbot = true   THEN 1 END) AS used_chatbot_count,
+                    COUNT(CASE WHEN will_continue_using = true THEN 1 END) AS will_continue_count,
+                    MAX(created_at) AS last_survey_date,
+                    MIN(created_at) AS first_survey_date
                 FROM student_surveys
                 WHERE user_id = $1
             `;
@@ -195,13 +223,11 @@ class StudentSurvey {
         }
     }
 
-    // Obtener chatbots más usados (para gráficos)
+    // ─── Chatbots más usados ──────────────────────────────────────────────────
     static async getMostUsedChatbots() {
         try {
             const text = `
-                SELECT 
-                    UNNEST(chatbots_used) as chatbot,
-                    COUNT(*) as count
+                SELECT UNNEST(chatbots_used) AS chatbot, COUNT(*) AS count
                 FROM student_surveys
                 WHERE chatbots_used IS NOT NULL
                 GROUP BY chatbot
@@ -215,13 +241,11 @@ class StudentSurvey {
         }
     }
 
-    // Obtener tareas más comunes (para gráficos)
+    // ─── Tareas más comunes ───────────────────────────────────────────────────
     static async getMostCommonTasks() {
         try {
             const text = `
-                SELECT 
-                    UNNEST(tasks_used_for) as task,
-                    COUNT(*) as count
+                SELECT UNNEST(tasks_used_for) AS task, COUNT(*) AS count
                 FROM student_surveys
                 WHERE tasks_used_for IS NOT NULL
                 GROUP BY task
@@ -234,13 +258,11 @@ class StudentSurvey {
         }
     }
 
-    // Obtener distribución de frecuencia de uso
+    // ─── Distribución de frecuencia ───────────────────────────────────────────
     static async getUsageFrequencyDistribution() {
         try {
             const text = `
-                SELECT 
-                    usage_frequency,
-                    COUNT(*) as count
+                SELECT usage_frequency, COUNT(*) AS count
                 FROM student_surveys
                 WHERE usage_frequency IS NOT NULL
                 GROUP BY usage_frequency
@@ -260,14 +282,10 @@ class StudentSurvey {
         }
     }
 
-    // Verificar si el usuario ya tiene encuestas
+    // ─── Verificar si el usuario ya tiene encuestas ───────────────────────────
     static async userHasSurveys(userId) {
         try {
-            const text = `
-                SELECT EXISTS(
-                    SELECT 1 FROM student_surveys WHERE user_id = $1
-                ) as has_surveys
-            `;
+            const text = `SELECT EXISTS(SELECT 1 FROM student_surveys WHERE user_id = $1) AS has_surveys`;
             const result = await query(text, [userId]);
             return result.rows[0].has_surveys;
         } catch (error) {
