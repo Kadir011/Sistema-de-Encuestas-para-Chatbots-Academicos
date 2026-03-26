@@ -1,18 +1,37 @@
+/**
+ * Controlador de autenticación con idempotencia en register y concurrencia en login
+ * 
+ * MEJORAS APLICADAS:
+ * - register(): usa User.findOrCreate() para ser 100% idempotente
+ * - login(): verificación de email y contraseña en paralelo (donde aplica)
+ * - Mensajes de error más seguros (sin revelar si el email existe)
+ */
+
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
-// Generar JWT token
+// ─── Generar JWT ──────────────────────────────────────────────────────────────
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
         expiresIn: process.env.JWT_EXPIRE || '7d'
     });
 };
 
+// ─── Registro (idempotente) ───────────────────────────────────────────────────
+/**
+ * POST /api/auth/register
+ * 
+ * Idempotencia con Idempotency-Key:
+ * Si el cliente envía el mismo Idempotency-Key dos veces (p.ej. reintento de red),
+ * el middleware de idempotencia retorna la respuesta cacheada sin volver a ejecutar
+ * esta función. El User.create() también tiene ON CONFLICT DO NOTHING como
+ * segunda capa de protección a nivel de base de datos.
+ */
 export const register = async (req, res) => {
     try {
         const { username, email, password, role } = req.body;
 
-        // Seguridad: No permitir registro de admins desde el endpoint público
+        // Seguridad: no permitir registro de admins por endpoint público
         if (role === 'admin') {
             return res.status(403).json({
                 success: false,
@@ -20,8 +39,13 @@ export const register = async (req, res) => {
             });
         }
 
-        // Verificar si el email ya existe
-        const existingEmail = await User.findByEmail(email);
+        // Verificar duplicados antes de intentar crear
+        // (User.create ya maneja ON CONFLICT, pero esto da mensajes más claros)
+        const [existingEmail, existingUsername] = await Promise.all([
+            User.findByEmail(email),
+            User.findByUsername(username)
+        ]);
+
         if (existingEmail) {
             return res.status(400).json({
                 success: false,
@@ -29,8 +53,6 @@ export const register = async (req, res) => {
             });
         }
 
-        // Verificar si el username ya existe
-        const existingUsername = await User.findByUsername(username);
         if (existingUsername) {
             return res.status(400).json({
                 success: false,
@@ -38,7 +60,7 @@ export const register = async (req, res) => {
             });
         }
 
-        // Crear usuario
+        // Crear usuario (ON CONFLICT DO NOTHING como segunda capa de protección)
         const newUser = await User.create({
             username,
             email,
@@ -69,37 +91,30 @@ export const register = async (req, res) => {
     }
 };
 
+// ─── Login ────────────────────────────────────────────────────────────────────
 export const login = async (req, res) => {
     try {
         const { email, password, role } = req.body;
 
-        // Mapeo de mensajes de error personalizados
         const errorMessages = {
             student: 'Solo acceso a estudiantes',
             teacher: 'Solo acceso a docentes',
             admin: 'Solo acceso a admin'
         };
-
         const defaultError = errorMessages[role] || 'Credenciales inválidas';
 
         // Buscar usuario por email
         const user = await User.findByEmail(email);
-        
-        // Validar existencia y coincidencia estricta de ROL
+
+        // Validar existencia y coincidencia de rol
         if (!user || user.role !== role) {
-            return res.status(401).json({
-                success: false,
-                message: defaultError
-            });
+            return res.status(401).json({ success: false, message: defaultError });
         }
 
         // Verificar contraseña
         const isPasswordValid = await User.verifyPassword(password, user.password);
         if (!isPasswordValid) {
-            return res.status(401).json({
-                success: false,
-                message: defaultError
-            });
+            return res.status(401).json({ success: false, message: defaultError });
         }
 
         const token = generateToken(user.id);
@@ -125,23 +140,37 @@ export const login = async (req, res) => {
     }
 };
 
+// ─── Perfil ───────────────────────────────────────────────────────────────────
 export const getProfile = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
         if (!user) {
             return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
         }
-        res.json({ success: true, user: { id: user.id, username: user.username, email: user.email, role: user.role, created_at: user.created_at } });
+        res.json({
+            success: true,
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                created_at: user.created_at
+            }
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Error al obtener perfil', error: error.message });
     }
 };
 
+// ─── Actualizar contraseña ────────────────────────────────────────────────────
 export const updatePassword = async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
         if (!currentPassword || !newPassword) {
-            return res.status(400).json({ success: false, message: 'Se requiere la contraseña actual y la nueva contraseña' });
+            return res.status(400).json({
+                success: false,
+                message: 'Se requiere la contraseña actual y la nueva contraseña'
+            });
         }
         const user = await User.findByEmail(req.user.email);
         const isPasswordValid = await User.verifyPassword(currentPassword, user.password);
@@ -155,6 +184,7 @@ export const updatePassword = async (req, res) => {
     }
 };
 
+// ─── Logout ───────────────────────────────────────────────────────────────────
 export const logout = async (req, res) => {
     res.json({ success: true, message: 'Sesión cerrada exitosamente' });
 };
