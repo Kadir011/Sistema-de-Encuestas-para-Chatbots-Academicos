@@ -1,43 +1,30 @@
 /**
- * Rutas de encuentas de estudiantes con idempotencia en creación de encuestas
+ * Rutas de Encuestas de Estudiantes (refactorizado)
+ *
+ * OCP: usa createSurveyController('student') — el controlador genérico
+ *      no necesita modificarse para agregar funcionalidad a este tipo.
  */
 
 import express from 'express';
-import {
-    createStudentSurvey,
-    getAllStudentSurveys,
-    getStudentSurveyById,
-    getMyStudentSurveys,
-    updateStudentSurvey,
-    deleteStudentSurvey,
-    getStudentSurveyStatistics,
-    getMyStatistics
-} from '../controllers/studentSurveyController.js';
+import createSurveyController from '../controllers/surveyController.js';
 import { verifyToken, verifyAdmin } from '../middlewares/authMiddleware.js';
 import { validateStudentSurvey, sanitizeInput } from '../middlewares/validationMiddleware.js';
 import { idempotencyMiddleware } from '../middlewares/idempotencyMiddleware.js';
 
 const router = express.Router();
+const ctrl = createSurveyController('student');
 
 router.use(verifyToken);
 
-// POST: idempotente — si el cliente reintenta con la misma Idempotency-Key,
-// no se crea una segunda encuesta.
-router.post('/',
-    idempotencyMiddleware,
-    sanitizeInput,
-    validateStudentSurvey,
-    createStudentSurvey
-);
-
-router.get('/my-surveys', getMyStudentSurveys);
-router.get('/statistics', getStudentSurveyStatistics);
-router.get('/my-statistics', getMyStatistics);
-router.get('/:id', getStudentSurveyById);
-router.put('/:id', sanitizeInput, validateStudentSurvey, updateStudentSurvey);
-router.delete('/:id', deleteStudentSurvey);
+router.post('/', idempotencyMiddleware, sanitizeInput, validateStudentSurvey, ctrl.create);
+router.get('/my-surveys', ctrl.getMySurveys);
+router.get('/statistics', ctrl.getStatistics);
+router.get('/my-statistics', ctrl.getMyStatistics);
+router.get('/:id', ctrl.getById);
+router.put('/:id', sanitizeInput, validateStudentSurvey, ctrl.update);
+router.delete('/:id', ctrl.remove);
 
 // Solo admin
-router.get('/', verifyAdmin, getAllStudentSurveys);
+router.get('/', verifyAdmin, ctrl.getAll);
 
 export default router;
