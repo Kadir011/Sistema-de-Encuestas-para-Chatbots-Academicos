@@ -1,117 +1,8 @@
 <div align="center">
 
-<!-- ═══════════════════════ HEADER BANNER ═══════════════════════ -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 280" width="900" height="280">
-  <defs>
-    <!-- Main gradient -->
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0f172a"/>
-      <stop offset="50%" style="stop-color:#1e3a8a"/>
-      <stop offset="100%" style="stop-color:#1d4ed8"/>
-    </linearGradient>
-    <!-- Accent gradient -->
-    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#60a5fa"/>
-      <stop offset="100%" style="stop-color:#a5f3fc"/>
-    </linearGradient>
-    <!-- Glow filter -->
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-      <feMerge>
-        <feMergeNode in="coloredBlur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-    <!-- Subtle grid pattern -->
-    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
-    </pattern>
-  </defs>
+# 🤖 ChatBot Survey Platform
 
-  <!-- Background -->
-  <rect width="900" height="280" fill="url(#bgGrad)" rx="14"/>
-  <rect width="900" height="280" fill="url(#grid)" rx="14"/>
-
-  <!-- Decorative circles -->
-  <circle cx="820" cy="50" r="120" fill="rgba(59,130,246,0.12)"/>
-  <circle cx="80" cy="230" r="90" fill="rgba(16,185,129,0.08)"/>
-  <circle cx="450" cy="-30" r="80" fill="rgba(99,179,237,0.07)"/>
-
-  <!-- Top accent line -->
-  <rect x="0" y="0" width="900" height="3" fill="url(#accentGrad)" rx="14"/>
-
-  <!-- Icon: Chat bubble with brain/circuit -->
-  <g transform="translate(60, 85)">
-    <!-- Outer glow ring -->
-    <circle cx="55" cy="55" r="52" fill="rgba(96,165,250,0.10)" filter="url(#glow)"/>
-    <!-- Icon background -->
-    <circle cx="55" cy="55" r="46" fill="rgba(30,58,138,0.7)" stroke="rgba(96,165,250,0.4)" stroke-width="1.5"/>
-    <!-- Chat bubble main -->
-    <rect x="22" y="28" width="66" height="46" rx="10" fill="none" stroke="url(#accentGrad)" stroke-width="2"/>
-    <!-- Chat tail -->
-    <path d="M 35 74 L 28 86 L 48 74 Z" fill="url(#accentGrad)"/>
-    <!-- Circuit dots inside bubble -->
-    <circle cx="40" cy="51" r="4" fill="#60a5fa"/>
-    <circle cx="55" cy="51" r="4" fill="#34d399"/>
-    <circle cx="70" cy="51" r="4" fill="#a5f3fc"/>
-    <!-- Connecting lines -->
-    <line x1="44" y1="51" x2="51" y2="51" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
-    <line x1="59" y1="51" x2="66" y2="51" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
-    <!-- Survey checkmarks at top -->
-    <circle cx="40" cy="38" r="2.5" fill="rgba(165,243,252,0.7)"/>
-    <circle cx="55" cy="38" r="2.5" fill="rgba(165,243,252,0.7)"/>
-    <circle cx="70" cy="38" r="2.5" fill="rgba(165,243,252,0.7)"/>
-  </g>
-
-  <!-- Main title -->
-  <text x="175" y="115" font-family="'Segoe UI', system-ui, sans-serif" font-size="36" font-weight="800" fill="white" letter-spacing="-0.5">ChatBot</text>
-  <text x="175" y="115" font-family="'Segoe UI', system-ui, sans-serif" font-size="36" font-weight="800" fill="url(#accentGrad)" letter-spacing="-0.5">
-    <tspan dx="152">Survey</tspan>
-  </text>
-  <text x="175" y="155" font-family="'Segoe UI', system-ui, sans-serif" font-size="36" font-weight="800" fill="white" letter-spacing="-0.5">Education Platform</text>
-
-  <!-- Subtitle -->
-  <text x="175" y="188" font-family="'Segoe UI', system-ui, sans-serif" font-size="15" fill="rgba(186,230,253,0.85)" letter-spacing="0.3">Recopila · Analiza · Visualiza el uso de IA en la educación</text>
-
-  <!-- Divider line -->
-  <line x1="175" y1="205" x2="720" y2="205" stroke="rgba(96,165,250,0.25)" stroke-width="1"/>
-
-  <!-- Stats row -->
-  <g transform="translate(175, 225)">
-    <!-- React -->
-    <circle cx="10" cy="10" r="8" fill="rgba(97,218,251,0.2)"/>
-    <text x="24" y="15" font-family="'Segoe UI', sans-serif" font-size="13" fill="#93c5fd" font-weight="600">React 19</text>
-    <!-- separator -->
-    <text x="90" y="15" font-family="sans-serif" font-size="13" fill="rgba(255,255,255,0.2)">|</text>
-    <!-- Node -->
-    <circle cx="104" cy="10" r="8" fill="rgba(52,211,153,0.2)"/>
-    <text x="118" y="15" font-family="'Segoe UI', sans-serif" font-size="13" fill="#6ee7b7" font-weight="600">Node.js 22</text>
-    <!-- separator -->
-    <text x="198" y="15" font-family="sans-serif" font-size="13" fill="rgba(255,255,255,0.2)">|</text>
-    <!-- Express -->
-    <circle cx="212" cy="10" r="8" fill="rgba(251,191,36,0.2)"/>
-    <text x="226" y="15" font-family="'Segoe UI', sans-serif" font-size="13" fill="#fcd34d" font-weight="600">Express 5</text>
-    <!-- separator -->
-    <text x="296" y="15" font-family="sans-serif" font-size="13" fill="rgba(255,255,255,0.2)">|</text>
-    <!-- PostgreSQL -->
-    <circle cx="310" cy="10" r="8" fill="rgba(167,139,250,0.2)"/>
-    <text x="324" y="15" font-family="'Segoe UI', sans-serif" font-size="13" fill="#c4b5fd" font-weight="600">PostgreSQL</text>
-    <!-- separator -->
-    <text x="408" y="15" font-family="sans-serif" font-size="13" fill="rgba(255,255,255,0.2)">|</text>
-    <!-- JWT -->
-    <circle cx="422" cy="10" r="8" fill="rgba(251,113,133,0.2)"/>
-    <text x="436" y="15" font-family="'Segoe UI', sans-serif" font-size="13" fill="#fda4af" font-weight="600">JWT Auth</text>
-  </g>
-
-  <!-- Bottom right decoration -->
-  <g transform="translate(750, 80)" opacity="0.15">
-    <rect x="0" y="0" width="100" height="8" rx="4" fill="white"/>
-    <rect x="0" y="18" width="75" height="8" rx="4" fill="white"/>
-    <rect x="0" y="36" width="90" height="8" rx="4" fill="white"/>
-    <rect x="0" y="54" width="60" height="8" rx="4" fill="white"/>
-    <rect x="0" y="72" width="85" height="8" rx="4" fill="white"/>
-  </g>
-</svg>
+### Plataforma full‑stack para recopilar y analizar datos sobre el uso de chatbots de IA en contextos educativos
 
 <br/>
 
@@ -122,9 +13,19 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.x-38bdf8?style=for-the-badge&logo=tailwindcss&logoColor=white&labelColor=0d1117)](https://tailwindcss.com/)
 [![License](https://img.shields.io/badge/License-Proprietary-ef4444?style=for-the-badge&labelColor=0d1117)](.)
 
-<p>
-  <strong>Plataforma full‑stack para recopilar y analizar datos sobre el uso de chatbots de IA en contextos educativos</strong>
-</p>
+<br/>
+
+![SOLID](https://img.shields.io/badge/Architecture-SOLID-6366f1?style=flat-square&labelColor=0d1117)
+![Repository](https://img.shields.io/badge/Pattern-Repository-0ea5e9?style=flat-square&labelColor=0d1117)
+![Observer](https://img.shields.io/badge/Pattern-Observer-10b981?style=flat-square&labelColor=0d1117)
+![Strategy](https://img.shields.io/badge/Pattern-Strategy-f59e0b?style=flat-square&labelColor=0d1117)
+![Factory](https://img.shields.io/badge/Pattern-Factory-ec4899?style=flat-square&labelColor=0d1117)
+
+<br/>
+
+> **Recopila · Analiza · Visualiza** el uso de IA en la educación
+>
+> *Backend refactorizado con principios **SOLID** y patrones de diseño profesionales — v2.0*
 
 </div>
 
@@ -145,19 +46,18 @@
 
 ## Tabla de Contenidos
 
-<div>
-
 - [Stack Tecnológico](#-stack-tecnológico)
 - [Arquitectura](#-arquitectura)
+- [Principios SOLID aplicados](#-principios-solid-aplicados)
+- [Patrones de Diseño](#-patrones-de-diseño)
 - [Estructura del Proyecto](#-estructura-del-proyecto)
 - [Configuración Local](#-configuración-local)
 - [API Reference](#-api-reference)
 - [Esquema de Base de Datos](#-esquema-de-base-de-datos)
-- [Seguridad](#-seguridad)
+- [Seguridad e Idempotencia](#-seguridad-e-idempotencia)
+- [Concurrencia](#-concurrencia)
 - [Despliegue](#-despliegue)
 - [Contacto](#-contacto)
-
-</div>
 
 ---
 
@@ -177,7 +77,7 @@
 | ![Chart.js](https://img.shields.io/badge/-Chart.js-ff6384?logo=chartdotjs&logoColor=white&style=flat-square) Chart.js | `4.5.1` | Visualización de datos |
 | ![Axios](https://img.shields.io/badge/-Axios-5a29e4?logo=axios&logoColor=white&style=flat-square) Axios | `1.13.2` | HTTP client |
 | ![Lucide](https://img.shields.io/badge/-Lucide-f97316?style=flat-square) Lucide React | `0.562.0` | Iconografía |
-| ![XLSX](https://img.shields.io/badge/-XLSX-217346?logo=microsoftexcel&logoColor=white&style=flat-square) XLSX | `0.18.5` | Exportación a Excel |
+| ![XLSX](https://img.shields.io/badge/-XLSX-217346?logo=microsoftexcel&logoColor=white&style=flat-square) XLSX JS Style | `1.2.0` | Exportación a Excel |
 | ![Vite](https://img.shields.io/badge/-Vite-646cff?logo=vite&logoColor=white&style=flat-square) Vite | `7.2.4` | Build tool |
 
 </td>
@@ -212,34 +112,60 @@
                              │  REST API  (HTTPS / JSON)
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                            BACKEND                                   │
-│                    Express.js  ·  MVC Pattern                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
-│  │ Controllers  │  │ Middlewares  │  │         Routes           │  │
-│  └──────────────┘  └──────────────┘  └──────────────────────────┘  │
-│  ┌──────────────┐  ┌──────────────┐                                 │
-│  │   Models     │  │  Services    │                                 │
-│  └──────────────┘  └──────────────┘                                 │
+│                   BACKEND  (SOLID + Design Patterns)                 │
+│                                                                      │
+│  ┌──────────────┐  ┌──────────────────┐  ┌──────────────────────┐  │
+│  │  Controllers │  │   Middlewares    │  │       Routes         │  │
+│  │  (Thin)      │  │ auth · validate  │  │  idempotency layer   │  │
+│  └──────┬───────┘  └──────────────────┘  └──────────────────────┘  │
+│         │ calls                                                       │
+│  ┌──────▼───────┐  ┌──────────────────┐                             │
+│  │   Services   │  │  EventEmitterBus │  ← Observer Pattern         │
+│  │  AuthService │  │  (Domain Events) │                             │
+│  │ SurveyService│  └──────────────────┘                             │
+│  └──────┬───────┘                                                    │
+│         │ depends on (DIP)                                           │
+│  ┌──────▼───────┐  ┌──────────────────┐                             │
+│  │ Repositories │  │  Validators      │  ← Strategy Pattern         │
+│  │  (Interface) │  │ ValidatorFactory │                             │
+│  └──────┬───────┘  └──────────────────┘                             │
+│         │                                                            │
+│  ┌──────▼───────┐                                                    │
+│  │    Models    │  ← Idempotent queries · Transactions               │
+│  └──────────────┘                                                    │
 └────────────────────────────┬────────────────────────────────────────┘
-                             │  PostgreSQL Queries
+                             │  Parameterized Queries
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                          POSTGRESQL                                   │
-│              Render — Managed PostgreSQL Instance (Neon)             │
+│   Neon/Render  ·  Connection Pool  ·  Indexes  ·  UNIQUE constraints │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Patrones de Diseño
+---
 
-<table>
-<tr>
-<td align="center" width="20%"><b>MVC</b><br/><sub>Separación clara de responsabilidades</sub></td>
-<td align="center" width="20%"><b>Repository</b><br/><sub>Capa de acceso a datos abstraída</sub></td>
-<td align="center" width="20%"><b>Middleware Pipeline</b><br/><sub>Procesamiento de requests</sub></td>
-<td align="center" width="20%"><b>Context API</b><br/><sub>Estado global en React</sub></td>
-<td align="center" width="20%"><b>Custom Hooks</b><br/><sub>Lógica reutilizable</sub></td>
-</tr>
-</table>
+## Principios SOLID aplicados
+
+| Principio | Dónde se aplica |
+|---|---|
+| **S** — Single Responsibility | Los **Thin Controllers** (`surveyController.js`, `authController.js`) solo traducen HTTP ↔ Service. Toda la lógica de negocio vive en los servicios correspondientes. |
+| **O** — Open/Closed | `createSurveyController(type)` sirve para estudiantes y profesores sin modificar el controlador. `ValidatorFactory` permite agregar nuevas reglas sin tocar las existentes. |
+| **L** — Liskov Substitution | `StudentSurveyRepository` y `TeacherSurveyRepository` implementan `ISurveyRepository` y son intercambiables donde se espere la interfaz base. |
+| **I** — Interface Segregation | `ISurveyRepository` e `IUserRepository` exponen solo los métodos que cada consumidor necesita, sin interfaces infladas. |
+| **D** — Dependency Inversion | `AuthService` depende de `IUserRepository`. `SurveyService` depende de `ISurveyRepository`. Las factories crean las implementaciones concretas; el código de alto nivel nunca las instancia directamente. |
+
+---
+
+## Patrones de Diseño
+
+| Patrón | Implementación |
+|---|---|
+| 🏭 **Factory Method** | `SurveyRepositoryFactory.create(type)` y `SurveyServiceFactory.create(type)` encapsulan la creación de objetos según el tipo (`student` / `teacher`). |
+| 📦 **Repository** | `StudentSurveyRepository`, `TeacherSurveyRepository` y `UserRepository` abstraen el acceso a datos. Los servicios trabajan contra la interfaz; sustituir PostgreSQL no requiere tocar la lógica de negocio. |
+| 🔔 **Observer** | `DomainEventBus` (singleton `EventEmitter`) actúa como bus central. Los servicios publican eventos (`USER_REGISTERED`, `STUDENT_SURVEY_CREATED`…) sin saber quién escucha. `AuditListener` y `MetricsListener` se suscriben al arranque. `GET /api/metrics` expone los contadores en tiempo real. |
+| 🎯 **Strategy** | `ValidationService` define reglas intercambiables (`RequiredFieldRule`, `EmailFormatRule`, `RangeRule`, `ConditionalRule`…) con interfaz `{ validate(data) }`. `ValidatorFactory` compone las estrategias correctas por caso de uso. |
+| 🔗 **Middleware Pipeline** | Cada request atraviesa: `verifyToken` → `idempotencyMiddleware` → `sanitizeInput` → `validateXxx` → `ctrl.action`. Cada middleware tiene una sola responsabilidad y es reutilizable. |
+| 🧩 **Context API + Custom Hooks** | `AuthContext`, `ThemeContext` y `SurveyContext` gestionan el estado global del frontend. `useAuth`, `useForm`, `usePagination`, `useDebounce` y `useToast` encapsulan lógica reutilizable. |
 
 ---
 
@@ -250,46 +176,49 @@ chatbots-survey-platform/
 │
 ├── 📂 backend/
 │   ├── 📂 config/
-│   │   └── database.js              ← Pool de conexiones PostgreSQL
+│   │   └── database.js              ← Pool · query · transaction · queryParallel
 │   ├── 📂 controllers/
-│   │   ├── authController.js        ← Registro, login, perfil
-│   │   ├── studentSurveyController.js
-│   │   ├── teacherSurveyController.js
+│   │   ├── authController.js        ← Thin Controller → AuthService
+│   │   ├── surveyController.js      ← Thin Controller genérico (OCP)
 │   │   ├── userController.js
-│   │   └── exportController.js      ← Exportación a Excel / estadísticas
+│   │   └── exportController.js      ← Queries paralelas con Promise.all
 │   ├── 📂 database/
-│   │   └── init.sql                 ← Esquema + seed inicial
+│   │   ├── init.sql                 ← Esquema + índices + seed admin
+│   │   └── migration_idempotency_concurrency.sql
+│   ├── 📂 listeners/
+│   │   └── domainEventListeners.js  ← Observer: AuditListener + MetricsListener
 │   ├── 📂 middlewares/
-│   │   ├── authMiddleware.js        ← JWT, roles, ownership
-│   │   └── validationMiddleware.js  ← Sanitización, validaciones
+│   │   ├── authMiddleware.js        ← JWT · roles · ownership
+│   │   ├── idempotencyMiddleware.js ← Cache HTTP por Idempotency-Key
+│   │   └── validationMiddleware.js  ← Strategy: ValidatorFactory
 │   ├── 📂 models/
-│   │   ├── User.js
-│   │   ├── StudentSurvey.js
+│   │   ├── User.js                  ← ON CONFLICT DO NOTHING/UPDATE · bcrypt
+│   │   ├── StudentSurvey.js         ← Idempotent inserts · transactions
 │   │   └── TeacherSurvey.js
+│   ├── 📂 repositories/
+│   │   ├── SurveyRepository.js      ← ISurveyRepository · Factory (LSP + DIP)
+│   │   └── UserRepository.js        ← IUserRepository (DIP)
 │   ├── 📂 routes/
-│   │   ├── authRoutes.js
-│   │   ├── userRoutes.js
+│   │   ├── authRoutes.js            ← idempotencyMiddleware en /register
 │   │   ├── studentSurveyRoutes.js
 │   │   ├── teacherSurveyRoutes.js
+│   │   ├── userRoutes.js
 │   │   └── exportRoutes.js
-│   ├── .env.example
-│   ├── package.json
-│   └── server.js                    ← Entry point
+│   ├── 📂 services/
+│   │   ├── AuthService.js           ← SRP · DIP · Observer (publica eventos)
+│   │   ├── SurveyService.js         ← SRP · OCP · Observer · Factory
+│   │   ├── ValidationService.js     ← Strategy · Factory · OCP
+│   │   └── EventEmitterService.js   ← Observer: DomainEventBus singleton
+│   └── server.js                    ← Arranque · registerAllListeners · /api/metrics
 │
 ├── 📂 frontend/
 │   └── 📂 src/
-│       ├── 📂 components/
-│       │   ├── admin/               ← ExportModal
-│       │   ├── auth/                ← LoginForm, RegisterForm, ProtectedRoute
-│       │   ├── common/              ← Button, Modal, Alert, Table…
-│       │   ├── dashboard/           ← Chart, StatsCard, RecentActivity
-│       │   ├── layout/              ← Navbar, Sidebar, Footer, Layout
-│       │   └── surveys/             ← StudentSurveyForm, TeacherSurveyForm…
-│       ├── 📂 contexts/             ← AuthContext, ThemeContext, SurveyContext
-│       ├── 📂 hooks/                ← useAuth, useForm, usePagination…
-│       ├── 📂 pages/                ← Dashboard, Statistics, MySurveys…
-│       ├── 📂 services/             ← api.js, surveyService, authService…
-│       └── 📂 utils/                ← validators, formatters, constants
+│       ├── 📂 components/           ← Atomic design: common · layout · surveys · dashboard
+│       ├── 📂 contexts/             ← AuthContext · ThemeContext · SurveyContext
+│       ├── 📂 hooks/                ← useAuth · useForm · usePagination · useDebounce…
+│       ├── 📂 pages/                ← Dashboard · Statistics · MySurveys…
+│       ├── 📂 services/             ← api.js · surveyService · authService · exportService
+│       └── 📂 utils/                ← validators · formatters · constants · helpers
 │
 ├── setup.sh
 └── README.md
@@ -308,7 +237,17 @@ chatbots-survey-platform/
 - **PostgreSQL** `14.x+` (local) o cuenta en [Neon](https://neon.tech)
 - **npm** o **yarn**
 
-### Instalación
+### Instalación rápida (script automático)
+
+```bash
+git clone https://github.com/Kadir011/Sistema-de-Encuestas-para-Chatbots-Acad-micos.git
+cd Sistema-de-Encuestas-para-Chatbots-Acad-micos
+chmod +x setup.sh && ./setup.sh
+```
+
+El script instala dependencias, crea la base de datos, ejecuta `init.sql` (tablas + índices de idempotencia + usuario admin) y genera los archivos `.env`.
+
+### Instalación manual
 
 **1. Clonar el repositorio**
 
@@ -320,10 +259,7 @@ cd Sistema-de-Encuestas-para-Chatbots-Acad-micos
 **2. Instalar dependencias**
 
 ```bash
-# Backend
-cd backend && npm install
-
-# Frontend
+cd backend  && npm install
 cd ../frontend && npm install
 ```
 
@@ -336,7 +272,7 @@ cd ../frontend && npm install
 PORT=5000
 NODE_ENV=development
 
-# PostgreSQL (Neon)
+# PostgreSQL (Neon o local)
 DATABASE_URL=postgresql://[user]:[password]@[host]/[database]?sslmode=require
 DB_POOL_MAX=10
 DB_IDLE_TIMEOUT=30000
@@ -377,7 +313,7 @@ cd backend && npm run dev
 cd frontend && npm run dev
 ```
 
-### Credenciales por Defecto
+### Credenciales por defecto
 
 ```
 Email:    admin@gmail.com
@@ -396,35 +332,35 @@ Role:     Administrador
 
 | Método | Endpoint | Auth | Descripción |
 |:---:|---|:---:|---|
-| `POST` | `/register` | ❌ | Registrar nuevo usuario |
-| `POST` | `/login` | ❌ | Iniciar sesión (devuelve JWT) |
-| `GET` | `/profile` | ✅ | Obtener perfil del usuario autenticado |
+| `POST` | `/register` | ❌ | Registrar nuevo usuario (soporta `Idempotency-Key`) |
+| `POST` | `/login` | ❌ | Iniciar sesión — devuelve JWT |
+| `GET` | `/profile` | ✅ | Perfil del usuario autenticado |
 | `PUT` | `/password` | ✅ | Cambiar contraseña |
-| `POST` | `/logout` | ✅ | Cerrar sesión |
+| `POST` | `/logout` | ✅ | Cerrar sesión (publica evento `user.logout`) |
 
 ### Encuestas Estudiantes — `/api/student-surveys`
 
 | Método | Endpoint | Roles | Descripción |
 |:---:|---|:---:|---|
-| `POST` | `/` | `student` `admin` | Crear encuesta |
+| `POST` | `/` | `student` `admin` | Crear encuesta (idempotente por usuario+día) |
 | `GET` | `/` | `admin` | Listar todas las encuestas |
 | `GET` | `/my-surveys` | `student` `admin` | Mis encuestas |
-| `GET` | `/statistics` | `student` `admin` | Estadísticas globales / personales |
-| `GET` | `/my-statistics` | `student` | Estadísticas detalladas personales |
+| `GET` | `/statistics` | `student` `admin` | Estadísticas enriquecidas |
+| `GET` | `/my-statistics` | `student` | Estadísticas personales detalladas |
 | `GET` | `/:id` | `student` `admin` | Obtener encuesta por ID |
-| `PUT` | `/:id` | `student` `admin` | Actualizar encuesta |
+| `PUT` | `/:id` | `student` `admin` | Actualizar (transacción concurrente) |
 | `DELETE` | `/:id` | `student` `admin` | Eliminar encuesta |
 
 ### Encuestas Profesores — `/api/teacher-surveys`
 
 | Método | Endpoint | Roles | Descripción |
 |:---:|---|:---:|---|
-| `POST` | `/` | `teacher` `admin` | Crear encuesta |
+| `POST` | `/` | `teacher` `admin` | Crear encuesta (idempotente por usuario+día) |
 | `GET` | `/` | `admin` | Listar todas las encuestas |
 | `GET` | `/my-surveys` | `teacher` `admin` | Mis encuestas |
-| `GET` | `/statistics` | `teacher` `admin` | Estadísticas globales / personales |
+| `GET` | `/statistics` | `teacher` `admin` | Estadísticas enriquecidas |
 | `GET` | `/:id` | `teacher` `admin` | Obtener encuesta por ID |
-| `PUT` | `/:id` | `teacher` `admin` | Actualizar encuesta |
+| `PUT` | `/:id` | `teacher` `admin` | Actualizar (transacción concurrente) |
 | `DELETE` | `/:id` | `teacher` `admin` | Eliminar encuesta |
 
 ### Usuarios — `/api/users`
@@ -442,9 +378,15 @@ Role:     Administrador
 
 | Método | Endpoint | Descripción |
 |:---:|---|---|
-| `GET` | `/student-surveys` | Exportar encuestas de estudiantes (Excel) |
-| `GET` | `/teacher-surveys` | Exportar encuestas de profesores (Excel) |
-| `GET` | `/statistics` | Exportar estadísticas y análisis (Excel) |
+| `GET` | `/student-surveys` | Datos de encuestas de estudiantes (JSON → Excel en cliente) |
+| `GET` | `/teacher-surveys` | Datos de encuestas de profesores (JSON → Excel en cliente) |
+| `GET` | `/statistics` | Estadísticas con queries paralelas (`Promise.all`) |
+
+### Métricas — `/api/metrics`
+
+| Método | Endpoint | Descripción |
+|:---:|---|---|
+| `GET` | `/metrics` | Contadores en tiempo real del patrón Observer |
 
 ---
 
@@ -458,7 +400,7 @@ CREATE TABLE users (
     id          SERIAL PRIMARY KEY,
     username    VARCHAR(50)  UNIQUE NOT NULL,
     email       VARCHAR(255) UNIQUE NOT NULL,
-    password    VARCHAR(255) NOT NULL,
+    password    VARCHAR(255) NOT NULL,           -- bcrypt, 10 rounds
     role        VARCHAR(20)  NOT NULL CHECK (role IN ('student', 'teacher', 'admin')),
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -471,20 +413,20 @@ CREATE TABLE users (
 
 ```sql
 CREATE TABLE student_surveys (
-    id                      SERIAL PRIMARY KEY,
-    user_id                 INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    has_used_chatbot        BOOLEAN NOT NULL,
-    chatbots_used           TEXT[],
-    usage_frequency         VARCHAR(50),
-    usefulness_rating       INTEGER CHECK (usefulness_rating BETWEEN 1 AND 5),
-    tasks_used_for          TEXT[],
-    overall_experience      INTEGER CHECK (overall_experience BETWEEN 1 AND 5),
-    preferred_chatbot       VARCHAR(100),
+    id                       SERIAL PRIMARY KEY,
+    user_id                  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    has_used_chatbot         BOOLEAN NOT NULL,
+    chatbots_used            TEXT[],
+    usage_frequency          VARCHAR(50),
+    usefulness_rating        INTEGER CHECK (usefulness_rating BETWEEN 1 AND 5),
+    tasks_used_for           TEXT[],
+    overall_experience       INTEGER CHECK (overall_experience BETWEEN 1 AND 5),
+    preferred_chatbot        VARCHAR(100),
     effectiveness_comparison VARCHAR(100),
-    will_continue_using     BOOLEAN,
-    would_recommend         BOOLEAN,
-    additional_comments     TEXT,
-    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    will_continue_using      BOOLEAN,
+    would_recommend          BOOLEAN,
+    additional_comments      TEXT,
+    created_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -519,69 +461,52 @@ CREATE TABLE teacher_surveys (
 
 </details>
 
-**Índices para optimización de rendimiento:**
+**Índices de rendimiento:**
 
 ```sql
-CREATE INDEX idx_users_email            ON users(email);
-CREATE INDEX idx_users_role             ON users(role);
-CREATE INDEX idx_student_surveys_user   ON student_surveys(user_id);
-CREATE INDEX idx_teacher_surveys_user   ON teacher_surveys(user_id);
-CREATE INDEX idx_student_surveys_date   ON student_surveys(created_at DESC);
-CREATE INDEX idx_teacher_surveys_date   ON teacher_surveys(created_at DESC);
+CREATE INDEX idx_users_email              ON users(email);
+CREATE INDEX idx_users_role               ON users(role);
+CREATE INDEX idx_student_surveys_user_id  ON student_surveys(user_id);
+CREATE INDEX idx_teacher_surveys_user_id  ON teacher_surveys(user_id);
+CREATE INDEX idx_student_surveys_created  ON student_surveys(created_at DESC);
+CREATE INDEX idx_teacher_surveys_created  ON teacher_surveys(created_at DESC);
+```
+
+**Índices de idempotencia** (una encuesta por usuario por día):
+
+```sql
+CREATE UNIQUE INDEX idx_student_survey_user_day
+    ON student_surveys (user_id, DATE(created_at));
+
+CREATE UNIQUE INDEX idx_teacher_survey_user_day
+    ON teacher_surveys (user_id, DATE(created_at));
 ```
 
 ---
 
-## Seguridad
+## Seguridad e Idempotencia
 
-<table>
-<tr>
-<td align="center" width="33%">
+| Mecanismo | Descripción |
+|---|---|
+| 🔑 **JWT** | Tokens firmados con `JWT_SECRET`, expiración configurable (por defecto 7 días). |
+| 🔐 **Bcrypt** | Hash de contraseñas con 10 rondas de salt. Sin almacenamiento en texto plano. |
+| 🛡️ **CORS** | Orígenes permitidos configurables vía variable de entorno `FRONTEND_URL`. |
+| 👮 **Role-Based Access** | Middlewares `verifyAdmin`, `verifyTeacher`, `verifyStudent` y `verifyOwnership`. |
+| ✅ **Input Validation** | Strategy Pattern: reglas composables e independientes. Sanitización XSS en todos los endpoints. |
+| 💉 **SQL Injection** | Parameterized Queries en todas las consultas. Sin concatenación de strings. |
+| 🔁 **Idempotency-Key** | Header HTTP opcional en POST críticos. Cachea la respuesta 24 h y devuelve el mismo resultado ante reintentos o doble-clic. |
+| 🗃️ **ON CONFLICT** | `INSERT … ON CONFLICT DO NOTHING/UPDATE` en `User`. Protege contra duplicados bajo carga concurrente. |
 
-**🔑 JWT**
+---
 
-Tokens con expiración configurable (default: 7 días). Firmados con `JWT_SECRET`.
+## Concurrencia
 
-</td>
-<td align="center" width="33%">
-
-**🔐 Bcrypt**
-
-Hash de contraseñas con **10 rondas de salt**. Sin almacenamiento de texto plano.
-
-</td>
-<td align="center" width="33%">
-
-**🛡️ CORS**
-
-Orígenes permitidos configurables vía variable de entorno `FRONTEND_URL`.
-
-</td>
-</tr>
-<tr>
-<td align="center">
-
-**✅ Input Validation**
-
-Sanitización en todos los endpoints. Middleware de validación dedicado.
-
-</td>
-<td align="center">
-
-**💉 SQL Injection**
-
-Prevención mediante **Parameterized Queries** en todas las consultas a PostgreSQL.
-
-</td>
-<td align="center">
-
-**👮 Role-Based Access**
-
-Middlewares `verifyAdmin`, `verifyTeacher`, `verifyStudent` y `verifyOwnership`.
-
-</td>
-</tr>
-</table>
+| Mecanismo | Descripción |
+|---|---|
+| **Pool de conexiones** | Hasta `DB_POOL_MAX` (por defecto 10) conexiones simultáneas. Cada request obtiene su propia conexión sin bloqueos. |
+| **Transacciones con reintentos** | `transaction(callback, maxRetries)` detecta `40001` (serialization failure) y `40P01` (deadlock) y reintenta con backoff exponencial: 100 ms → 200 ms → 400 ms. |
+| **Queries paralelas** | `exportStatistics`, `AuthService.register` y `SurveyService.getEnrichedStatistics` usan `Promise.all` para lanzar múltiples queries simultáneamente. |
+| **UNIQUE index por día** | Previene encuestas duplicadas incluso si dos requests con los mismos datos llegan en el mismo milisegundo. |
 
 ---
 
@@ -592,7 +517,7 @@ Middlewares `verifyAdmin`, `verifyTeacher`, `verifyStudent` y `verifyOwnership`.
 ```
 1. Crear base de datos PostgreSQL en Neon (https://neon.tech)
 2. Crear un Web Service en Render (https://render.com)
-3. Configurar DATABASE_URL en el dashboard de Render
+3. Configurar las variables de entorno en el dashboard de Render
 4. Ejecutar init.sql en la base de datos Neon
 5. Deploy automático desde la rama main
 ```
@@ -611,6 +536,8 @@ Middlewares `verifyAdmin`, `verifyTeacher`, `verifyStudent` y `verifyOwnership`.
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string (Neon) |
 | `JWT_SECRET` | Clave secreta para firmar JWT |
+| `DB_POOL_MAX` | Máximo de conexiones del pool (recomendado: 10) |
+| `FRONTEND_URL` | URL del frontend (CORS) |
 | `VITE_API_URL` | URL del backend en producción |
 
 ---
@@ -635,6 +562,6 @@ Middlewares `verifyAdmin`, `verifyTeacher`, `verifyStudent` y `verifyOwnership`.
 
 ---
 
-<sub>Made with ❤️ by Kadir Barquet · ChatBot Survey Platform © 2024</sub>
+<sub>Made with ❤️ by Kadir Barquet · ChatBot Survey Platform © 2025 · v2.0 — SOLID + Repository + Strategy + Observer + Factory</sub>
 
 </div>
