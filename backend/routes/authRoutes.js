@@ -14,20 +14,17 @@ import { idempotencyMiddleware } from '../middlewares/idempotencyMiddleware.js';
 
 const router = express.Router();
 
-// ─── Rutas públicas ───────────────────────────────────────────────────────────
-
-// Registro: idempotente con Idempotency-Key opcional en el header.
-// Si el cliente lo envía, dos registros con la misma clave retornan el mismo resultado.
+// Rutas públicas
 router.post('/register',
-    idempotencyMiddleware,   // Primera capa: cache de respuesta por Idempotency-Key
+    idempotencyMiddleware,   // Capa 1: cache HTTP por Idempotency-Key
     sanitizeInput,
     validateRegister,
-    register                 // Segunda capa: ON CONFLICT DO NOTHING en la BD
+    register                 // Capa 2: ON CONFLICT DO NOTHING en BD
 );
 
 router.post('/login', sanitizeInput, validateLogin, login);
 
-// ─── Rutas protegidas ─────────────────────────────────────────────────────────
+// Rutas protegidas
 router.get('/profile', verifyToken, getProfile);
 router.put('/password', verifyToken, sanitizeInput, updatePassword);
 router.post('/logout', verifyToken, logout);
