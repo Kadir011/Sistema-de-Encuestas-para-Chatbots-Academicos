@@ -111,7 +111,7 @@ const startServer = async () => {
             console.warn('Advertencia: Servidor iniciado sin conexión a BD');
         }
 
-        const server = app.listen(PORT, () => {
+        const server = app.listen(PORT, '0.0.0.0', () => {
             console.log('\n' + '='.repeat(60));
             console.log('   SERVIDOR CORRIENDO');
             console.log('='.repeat(60));
