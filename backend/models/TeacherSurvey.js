@@ -1,323 +1,346 @@
 /**
- * Modelo de encuesta de profesor con idempotencia y concurrencia
- * 
- * MEJORAS APLICADAS:
- * - create(): idempotente, evita encuestas duplicadas por usuario+día
- * - update(): transacción para concurrencia segura
- * - getStatistics(): query única con todas las agregaciones
- * - getCountryDistribution / getMostCommonPurposes: sin cambios (solo lectura)
+ * Modelo de Encuesta de Profesor — Mongoose Schema
+ *
+ * Equivalencias con la versión PostgreSQL:
+ *  - TEXT[]                          → [String]
+ *  - UNIQUE(user_id, DATE(created_at)) → índice compuesto + survey_date
+ *  - UNNEST + GROUP BY               → $unwind + $group en aggregation pipeline
+ *
+ * SOLID: SRP — solo define la estructura y el acceso a datos de encuestas docentes.
  */
 
-import { query, queryIdempotent, transaction } from '../config/database.js';
+import mongoose from 'mongoose';
 
+// ─── Schema ───────────────────────────────────────────────────────────────────
+const teacherSurveySchema = new mongoose.Schema(
+    {
+        user_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true,
+        },
+        has_used_chatbot: {
+            type: Boolean,
+            required: true,
+        },
+        chatbots_used: [String],
+        courses_used: [String],
+        purposes: [String],
+        outcomes: [String],
+        challenges: [String],
+        likelihood_future_use: String,
+        advantages: [String],
+        concerns: [String],
+        resources_needed: [String],
+        would_recommend: Boolean,
+        age_range: String,
+        institution_type: String,
+        countries: [String],
+        years_experience: String,
+        additional_comments: String,
+        // Campo auxiliar para el índice de idempotencia (una encuesta por día)
+        survey_date: String,
+    },
+    {
+        timestamps: { createdAt: 'created_at', updatedAt: false },
+        versionKey: false,
+    }
+);
+
+// ─── Índices de rendimiento ───────────────────────────────────────────────────
+teacherSurveySchema.index({ user_id: 1 });
+teacherSurveySchema.index({ created_at: -1 });
+
+// ─── Índice de idempotencia ───────────────────────────────────────────────────
+teacherSurveySchema.index({ user_id: 1, survey_date: 1 }, { unique: true });
+
+const TeacherSurveyModel = mongoose.model(
+    'TeacherSurvey',
+    teacherSurveySchema,
+    'teacher_surveys'
+);
+
+// ─── Helper: pipeline con JOIN al usuario ─────────────────────────────────────
+const withUserPipeline = (matchStage = {}) => [
+    { $match: matchStage },
+    {
+        $lookup: {
+            from: 'users',
+            localField: 'user_id',
+            foreignField: '_id',
+            as: '_user',
+        },
+    },
+    { $unwind: { path: '$_user', preserveNullAndEmptyArrays: true } },
+    {
+        $addFields: {
+            id: { $toString: '$_id' },
+            username: '$_user.username',
+            email: '$_user.email',
+            role: '$_user.role',
+        },
+    },
+    { $sort: { created_at: -1 } },
+];
+
+const normalize = (doc) => {
+    if (!doc) return null;
+    const { _id, _user, survey_date, ...rest } = doc;
+    return { id: _id?.toString() ?? doc.id, ...rest };
+};
+
+// ─── Clase estática TeacherSurvey (misma API que la versión pg) ───────────────
 class TeacherSurvey {
 
-    // ─── Crear encuesta (idempotente por usuario + fecha) ────────────────────
-    /**
-     * Inserta de forma idempotente.
-     * Si el profesor ya envió una encuesta hoy, se retorna un error claro
-     * en lugar de crear un duplicado.
-     * 
-     * NOTA: Para activar la restricción de un solo envío por día, ejecutar:
-     *   CREATE UNIQUE INDEX IF NOT EXISTS idx_teacher_survey_user_day
-     *   ON teacher_surveys (user_id, DATE(created_at));
-     */
+    // ── Crear encuesta (idempotente por usuario + día) ────────────────────────
     static async create(surveyData) {
         try {
-            const text = `
-                INSERT INTO teacher_surveys (
-                    user_id, has_used_chatbot, chatbots_used, courses_used,
-                    purposes, outcomes, challenges, likelihood_future_use,
-                    advantages, concerns, resources_needed, would_recommend,
-                    age_range, institution_type, countries, years_experience, additional_comments
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-                RETURNING *
-            `;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const surveyDate = today.toISOString().split('T')[0];
 
-            const values = [
-                surveyData.user_id,
-                surveyData.has_used_chatbot,
-                surveyData.chatbots_used || [],
-                surveyData.courses_used || [],
-                surveyData.purposes || [],
-                surveyData.outcomes || [],
-                surveyData.challenges || [],
-                surveyData.likelihood_future_use,
-                surveyData.advantages || [],
-                surveyData.concerns || [],
-                surveyData.resources_needed || [],
-                surveyData.would_recommend,
-                surveyData.age_range,
-                surveyData.institution_type,
-                surveyData.countries || [],
-                surveyData.years_experience,
-                surveyData.additional_comments
-            ];
+            const doc = new TeacherSurveyModel({
+                user_id: surveyData.user_id,
+                survey_date: surveyDate,
+                has_used_chatbot: surveyData.has_used_chatbot,
+                chatbots_used: surveyData.chatbots_used || [],
+                courses_used: surveyData.courses_used || [],
+                purposes: surveyData.purposes || [],
+                outcomes: surveyData.outcomes || [],
+                challenges: surveyData.challenges || [],
+                likelihood_future_use: surveyData.likelihood_future_use,
+                advantages: surveyData.advantages || [],
+                concerns: surveyData.concerns || [],
+                resources_needed: surveyData.resources_needed || [],
+                would_recommend: surveyData.would_recommend,
+                age_range: surveyData.age_range,
+                institution_type: surveyData.institution_type,
+                countries: surveyData.countries || [],
+                years_experience: surveyData.years_experience,
+                additional_comments: surveyData.additional_comments,
+            });
 
-            const result = await queryIdempotent(text, values);
-            return result.rows[0];
+            await doc.save();
+            return normalize(doc.toObject());
         } catch (error) {
-            if (error.code === '23505') {
-                throw new Error('Ya existe una encuesta registrada para hoy. Solo se permite una encuesta por día.');
+            if (error.code === 11000) {
+                throw new Error(
+                    'Ya existe una encuesta registrada para hoy. Solo se permite una encuesta por día.'
+                );
             }
             throw new Error(`Error al crear encuesta de profesor: ${error.message}`);
         }
     }
 
-    // ─── Obtener todas las encuestas ──────────────────────────────────────────
+    // ── findAll ───────────────────────────────────────────────────────────────
     static async findAll() {
-        try {
-            const text = `
-                SELECT t.*, u.username, u.email, u.role
-                FROM teacher_surveys t
-                JOIN users u ON t.user_id = u.id
-                ORDER BY t.created_at DESC
-            `;
-            const result = await query(text);
-            return result.rows;
-        } catch (error) {
-            throw new Error(`Error al obtener encuestas: ${error.message}`);
-        }
+        const docs = await TeacherSurveyModel.aggregate(withUserPipeline());
+        return docs.map(normalize);
     }
 
-    // ─── Obtener por ID ───────────────────────────────────────────────────────
+    // ── findById ──────────────────────────────────────────────────────────────
     static async findById(id) {
         try {
-            const text = `
-                SELECT t.*, u.username, u.email, u.role
-                FROM teacher_surveys t
-                JOIN users u ON t.user_id = u.id
-                WHERE t.id = $1
-            `;
-            const result = await query(text, [id]);
-            return result.rows[0];
-        } catch (error) {
-            throw new Error(`Error al obtener encuesta: ${error.message}`);
+            const docs = await TeacherSurveyModel.aggregate(
+                withUserPipeline({ _id: new mongoose.Types.ObjectId(id) })
+            );
+            return normalize(docs[0]);
+        } catch {
+            return null;
         }
     }
 
-    // ─── Obtener por usuario ──────────────────────────────────────────────────
+    // ── findByUserId ──────────────────────────────────────────────────────────
     static async findByUserId(userId) {
         try {
-            const text = `
-                SELECT t.*, u.username, u.email, u.role
-                FROM teacher_surveys t
-                JOIN users u ON t.user_id = u.id
-                WHERE t.user_id = $1
-                ORDER BY t.created_at DESC
-            `;
-            const result = await query(text, [userId]);
-            return result.rows;
-        } catch (error) {
-            throw new Error(`Error al obtener encuestas del usuario: ${error.message}`);
+            const docs = await TeacherSurveyModel.aggregate(
+                withUserPipeline({ user_id: new mongoose.Types.ObjectId(userId) })
+            );
+            return docs.map(normalize);
+        } catch {
+            return [];
         }
     }
 
-    // ─── Actualizar encuesta (con transacción) ────────────────────────────────
+    // ── Actualizar ────────────────────────────────────────────────────────────
     static async update(id, surveyData) {
         try {
-            return await transaction(async (client) => {
-                const text = `
-                    UPDATE teacher_surveys 
-                    SET 
-                        has_used_chatbot = COALESCE($1,  has_used_chatbot),
-                        chatbots_used = COALESCE($2,  chatbots_used),
-                        courses_used = COALESCE($3,  courses_used),
-                        purposes = COALESCE($4,  purposes),
-                        outcomes = COALESCE($5,  outcomes),
-                        challenges = COALESCE($6,  challenges),
-                        likelihood_future_use = COALESCE($7,  likelihood_future_use),
-                        advantages = COALESCE($8,  advantages),
-                        concerns = COALESCE($9,  concerns),
-                        resources_needed = COALESCE($10, resources_needed),
-                        would_recommend = COALESCE($11, would_recommend),
-                        age_range = COALESCE($12, age_range),
-                        institution_type = COALESCE($13, institution_type),
-                        countries = COALESCE($14, countries),
-                        years_experience = COALESCE($15, years_experience),
-                        additional_comments = COALESCE($16, additional_comments)
-                    WHERE id = $17
-                    RETURNING *
-                `;
-
-                const values = [
-                    surveyData.has_used_chatbot,
-                    surveyData.chatbots_used,
-                    surveyData.courses_used,
-                    surveyData.purposes,
-                    surveyData.outcomes,
-                    surveyData.challenges,
-                    surveyData.likelihood_future_use,
-                    surveyData.advantages,
-                    surveyData.concerns,
-                    surveyData.resources_needed,
-                    surveyData.would_recommend,
-                    surveyData.age_range,
-                    surveyData.institution_type,
-                    surveyData.countries,
-                    surveyData.years_experience,
-                    surveyData.additional_comments,
-                    id
-                ];
-
-                const result = await client.query(text, values);
-                return result.rows[0];
+            const fields = [
+                'has_used_chatbot', 'chatbots_used', 'courses_used', 'purposes',
+                'outcomes', 'challenges', 'likelihood_future_use', 'advantages',
+                'concerns', 'resources_needed', 'would_recommend', 'age_range',
+                'institution_type', 'countries', 'years_experience', 'additional_comments',
+            ];
+            const updates = {};
+            fields.forEach(f => {
+                if (surveyData[f] !== undefined) updates[f] = surveyData[f];
             });
+
+            const doc = await TeacherSurveyModel.findByIdAndUpdate(
+                id,
+                { $set: updates },
+                { new: true, runValidators: true }
+            ).lean();
+
+            return normalize(doc);
         } catch (error) {
             throw new Error(`Error al actualizar encuesta: ${error.message}`);
         }
     }
 
-    // ─── Eliminar encuesta ────────────────────────────────────────────────────
+    // ── Eliminar ──────────────────────────────────────────────────────────────
     static async delete(id) {
         try {
-            const text = 'DELETE FROM teacher_surveys WHERE id = $1 RETURNING id';
-            const result = await query(text, [id]);
-            return result.rows[0];
-        } catch (error) {
-            throw new Error(`Error al eliminar encuesta: ${error.message}`);
+            const doc = await TeacherSurveyModel.findByIdAndDelete(id).lean();
+            return doc ? { id: doc._id.toString() } : null;
+        } catch {
+            return null;
         }
     }
 
-    // ─── Estadísticas globales (query única) ──────────────────────────────────
+    // ── Estadísticas globales ─────────────────────────────────────────────────
     static async getStatistics() {
-        try {
-            const text = `
-                SELECT 
-                    COUNT(*) AS total_surveys,
-                    COUNT(CASE WHEN has_used_chatbot = true THEN 1 END) AS teachers_using_chatbots,
-                    COUNT(CASE WHEN likelihood_future_use = 'Muy probable' THEN 1 END) AS very_likely_continue,
-                    COUNT(CASE WHEN likelihood_future_use = 'Probable' THEN 1 END) AS likely_continue,
-                    COUNT(CASE WHEN likelihood_future_use = 'Imposible' THEN 1 END) AS unlikely_continue,
-                    COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days'  THEN 1 END) AS new_this_week,
-                    COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) AS new_this_month
-                FROM teacher_surveys
-            `;
-            const result = await query(text);
-            return result.rows[0];
-        } catch (error) {
-            throw new Error(`Error al obtener estadísticas: ${error.message}`);
-        }
+        const now = new Date();
+        const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+        const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+        const [agg] = await TeacherSurveyModel.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    total_surveys: { $sum: 1 },
+                    teachers_using_chatbots: {
+                        $sum: { $cond: ['$has_used_chatbot', 1, 0] },
+                    },
+                    very_likely_continue: {
+                        $sum: {
+                            $cond: [{ $eq: ['$likelihood_future_use', 'Muy probable'] }, 1, 0],
+                        },
+                    },
+                    likely_continue: {
+                        $sum: {
+                            $cond: [{ $eq: ['$likelihood_future_use', 'Probable'] }, 1, 0],
+                        },
+                    },
+                    unlikely_continue: {
+                        $sum: {
+                            $cond: [{ $eq: ['$likelihood_future_use', 'Imposible'] }, 1, 0],
+                        },
+                    },
+                    new_this_week: {
+                        $sum: {
+                            $cond: [{ $gte: ['$created_at', sevenDaysAgo] }, 1, 0],
+                        },
+                    },
+                    new_this_month: {
+                        $sum: {
+                            $cond: [{ $gte: ['$created_at', thirtyDaysAgo] }, 1, 0],
+                        },
+                    },
+                },
+            },
+            { $project: { _id: 0 } },
+        ]);
+
+        return agg ?? {
+            total_surveys: 0, teachers_using_chatbots: 0,
+            very_likely_continue: 0, likely_continue: 0, unlikely_continue: 0,
+            new_this_week: 0, new_this_month: 0,
+        };
     }
 
-    // ─── Estadísticas por usuario ─────────────────────────────────────────────
+    // ── Estadísticas por usuario ──────────────────────────────────────────────
     static async getUserStatistics(userId) {
         try {
-            const text = `
-                SELECT 
-                    COUNT(*) AS total_surveys,
-                    COUNT(CASE WHEN has_used_chatbot = true THEN 1 END) AS used_chatbot_count,
-                    MAX(created_at) AS last_survey_date,
-                    MIN(created_at) AS first_survey_date,
-                    likelihood_future_use AS current_likelihood
-                FROM teacher_surveys
-                WHERE user_id = $1
-                GROUP BY likelihood_future_use
-                ORDER BY MAX(created_at) DESC
-                LIMIT 1
-            `;
-            const result = await query(text, [userId]);
-            return result.rows[0];
-        } catch (error) {
-            throw new Error(`Error al obtener estadísticas del usuario: ${error.message}`);
+            const [agg] = await TeacherSurveyModel.aggregate([
+                { $match: { user_id: new mongoose.Types.ObjectId(userId) } },
+                { $sort: { created_at: -1 } },
+                {
+                    $group: {
+                        _id: null,
+                        total_surveys: { $sum: 1 },
+                        used_chatbot_count: {
+                            $sum: { $cond: ['$has_used_chatbot', 1, 0] },
+                        },
+                        last_survey_date: { $max: '$created_at' },
+                        first_survey_date: { $min: '$created_at' },
+                        current_likelihood: { $first: '$likelihood_future_use' },
+                    },
+                },
+                { $project: { _id: 0 } },
+            ]);
+            return agg ?? { total_surveys: 0 };
+        } catch {
+            return { total_surveys: 0 };
         }
     }
 
-    // ─── Distribución por país ────────────────────────────────────────────────
+    // ── Distribución por país ─────────────────────────────────────────────────
     static async getCountryDistribution() {
-        try {
-            const text = `
-                SELECT country, COUNT(*) AS count
-                FROM (SELECT UNNEST(countries) AS country FROM teacher_surveys) subquery
-                WHERE country IS NOT NULL
-                GROUP BY country
-                ORDER BY count DESC
-            `;
-            const result = await query(text);
-            return result.rows;
-        } catch (error) {
-            throw new Error(`Error al obtener distribución por país: ${error.message}`);
-        }
+        return TeacherSurveyModel.aggregate([
+            { $match: { countries: { $exists: true, $ne: [] } } },
+            { $unwind: '$countries' },
+            { $group: { _id: '$countries', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $project: { _id: 0, country: '$_id', count: 1 } },
+        ]);
     }
 
-    // ─── Distribución por institución ─────────────────────────────────────────
+    // ── Distribución por institución ──────────────────────────────────────────
     static async getInstitutionDistribution() {
-        try {
-            const text = `
-                SELECT institution_type, COUNT(*) AS count
-                FROM teacher_surveys
-                WHERE institution_type IS NOT NULL
-                GROUP BY institution_type
-                ORDER BY count DESC
-            `;
-            const result = await query(text);
-            return result.rows;
-        } catch (error) {
-            throw new Error(`Error al obtener distribución por institución: ${error.message}`);
-        }
+        return TeacherSurveyModel.aggregate([
+            { $match: { institution_type: { $exists: true, $ne: null } } },
+            { $group: { _id: '$institution_type', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $project: { _id: 0, institution_type: '$_id', count: 1 } },
+        ]);
     }
 
-    // ─── Propósitos más comunes ───────────────────────────────────────────────
+    // ── Propósitos más comunes ────────────────────────────────────────────────
     static async getMostCommonPurposes() {
-        try {
-            const text = `
-                SELECT UNNEST(purposes) AS purpose, COUNT(*) AS count
-                FROM teacher_surveys
-                WHERE purposes IS NOT NULL
-                GROUP BY purpose
-                ORDER BY count DESC
-            `;
-            const result = await query(text);
-            return result.rows;
-        } catch (error) {
-            throw new Error(`Error al obtener propósitos más comunes: ${error.message}`);
-        }
+        return TeacherSurveyModel.aggregate([
+            { $match: { purposes: { $exists: true, $ne: [] } } },
+            { $unwind: '$purposes' },
+            { $group: { _id: '$purposes', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $project: { _id: 0, purpose: '$_id', count: 1 } },
+        ]);
     }
 
-    // ─── Desafíos más comunes ─────────────────────────────────────────────────
+    // ── Desafíos más comunes ──────────────────────────────────────────────────
     static async getMostCommonChallenges() {
-        try {
-            const text = `
-                SELECT UNNEST(challenges) AS challenge, COUNT(*) AS count
-                FROM teacher_surveys
-                WHERE challenges IS NOT NULL
-                GROUP BY challenge
-                ORDER BY count DESC
-            `;
-            const result = await query(text);
-            return result.rows;
-        } catch (error) {
-            throw new Error(`Error al obtener desafíos más comunes: ${error.message}`);
-        }
+        return TeacherSurveyModel.aggregate([
+            { $match: { challenges: { $exists: true, $ne: [] } } },
+            { $unwind: '$challenges' },
+            { $group: { _id: '$challenges', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $project: { _id: 0, challenge: '$_id', count: 1 } },
+        ]);
     }
 
-    // ─── Recursos más solicitados ─────────────────────────────────────────────
+    // ── Recursos más solicitados ──────────────────────────────────────────────
     static async getMostRequestedResources() {
-        try {
-            const text = `
-                SELECT UNNEST(resources_needed) AS resource, COUNT(*) AS count
-                FROM teacher_surveys
-                WHERE resources_needed IS NOT NULL
-                GROUP BY resource
-                ORDER BY count DESC
-            `;
-            const result = await query(text);
-            return result.rows;
-        } catch (error) {
-            throw new Error(`Error al obtener recursos más solicitados: ${error.message}`);
-        }
+        return TeacherSurveyModel.aggregate([
+            { $match: { resources_needed: { $exists: true, $ne: [] } } },
+            { $unwind: '$resources_needed' },
+            { $group: { _id: '$resources_needed', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $project: { _id: 0, resource: '$_id', count: 1 } },
+        ]);
     }
 
-    // ─── Verificar si el usuario ya tiene encuestas ───────────────────────────
+    // ── userHasSurveys ────────────────────────────────────────────────────────
     static async userHasSurveys(userId) {
         try {
-            const text = `SELECT EXISTS(SELECT 1 FROM teacher_surveys WHERE user_id = $1) AS has_surveys`;
-            const result = await query(text, [userId]);
-            return result.rows[0].has_surveys;
-        } catch (error) {
-            throw new Error(`Error al verificar encuestas del usuario: ${error.message}`);
+            const count = await TeacherSurveyModel.countDocuments({
+                user_id: new mongoose.Types.ObjectId(userId),
+            });
+            return count > 0;
+        } catch {
+            return false;
         }
     }
 }
 
+export { TeacherSurveyModel };
 export default TeacherSurvey;

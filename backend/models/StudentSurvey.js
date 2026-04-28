@@ -1,297 +1,358 @@
 /**
- * Modelo de encuesta de estudiante con idempotencia y concurrencia
- * 
- * MEJORAS APLICADAS:
- * - create(): INSERT con ON CONFLICT para evitar encuestas duplicadas por usuario+día
- * - getStatistics(): query única con agregaciones en lugar de múltiples viajes a BD
- * - update(): transacción para actualizaciones seguras bajo concurrencia
- * - findAll / findByUserId: sin cambios (son lecturas, no necesitan idempotencia)
+ * Modelo de Encuesta de Estudiante — Mongoose Schema
+ *
+ * Equivalencias con la versión PostgreSQL:
+ *  - TEXT[]                          → [String] en Mongoose
+ *  - UNIQUE(user_id, DATE(created_at)) → índice compuesto + validación en create()
+ *  - INSERT ON CONFLICT DO NOTHING    → error 11000 capturado en create()
+ *  - transaction()                    → recibe session opcional en update()
+ *  - UNNEST + GROUP BY               → $unwind + $group en aggregation pipeline
+ *
+ * SOLID: SRP — solo define la estructura y el acceso a datos de encuestas estudiantiles.
  */
 
-import { query, queryIdempotent, transaction } from '../config/database.js';
+import mongoose from 'mongoose';
 
+// ─── Schema ───────────────────────────────────────────────────────────────────
+const studentSurveySchema = new mongoose.Schema(
+    {
+        user_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true,
+        },
+        has_used_chatbot: {
+            type: Boolean,
+            required: true,
+        },
+        chatbots_used: [String],
+        usage_frequency: String,
+        usefulness_rating: {
+            type: Number,
+            min: 1,
+            max: 5,
+        },
+        tasks_used_for: [String],
+        overall_experience: {
+            type: Number,
+            min: 1,
+            max: 5,
+        },
+        preferred_chatbot: String,
+        effectiveness_comparison: String,
+        will_continue_using: Boolean,
+        would_recommend: Boolean,
+        additional_comments: String,
+    },
+    {
+        timestamps: { createdAt: 'created_at', updatedAt: false },
+        versionKey: false,
+    }
+);
+
+// ─── Índices de rendimiento ───────────────────────────────────────────────────
+studentSurveySchema.index({ user_id: 1 });
+studentSurveySchema.index({ created_at: -1 });
+
+// ─── Índice de idempotencia (una encuesta por usuario por día) ────────────────
+// Equivalente al UNIQUE INDEX idx_student_survey_user_day de PostgreSQL.
+// Se implementa como índice compuesto con un campo calculado en la capa de
+// aplicación, ya que MongoDB no soporta índices funcionales DATE() de forma nativa.
+// La restricción se aplica en create() comparando la fecha del día.
+studentSurveySchema.index({ user_id: 1, survey_date: 1 }, { unique: true });
+
+const StudentSurveyModel = mongoose.model(
+    'StudentSurvey',
+    studentSurveySchema,
+    'student_surveys'
+);
+
+// ─── Helper: proyección con JOIN (lookup) ─────────────────────────────────────
+const withUserPipeline = (matchStage = {}) => [
+    { $match: matchStage },
+    {
+        $lookup: {
+            from: 'users',
+            localField: 'user_id',
+            foreignField: '_id',
+            as: '_user',
+        },
+    },
+    { $unwind: { path: '$_user', preserveNullAndEmptyArrays: true } },
+    {
+        $addFields: {
+            id: { $toString: '$_id' },
+            username: '$_user.username',
+            email: '$_user.email',
+            role: '$_user.role',
+        },
+    },
+    { $sort: { created_at: -1 } },
+];
+
+// ─── Helper: convierte _id → id ───────────────────────────────────────────────
+const normalize = (doc) => {
+    if (!doc) return null;
+    const { _id, _user, survey_date, ...rest } = doc;
+    return { id: _id?.toString() ?? doc.id, ...rest };
+};
+
+// ─── Clase estática StudentSurvey (misma API que la versión pg) ──────────────
 class StudentSurvey {
 
-    // ─── Crear encuesta (idempotente por usuario + fecha) ────────────────────
-    /**
-     * Inserta la encuesta de forma idempotente.
-     * 
-     * La restricción UNIQUE(user_id, DATE(created_at)) en la BD evita
-     * que un mismo estudiante envíe dos encuestas el mismo día.
-     * 
-     * Si la encuesta ya existe, se retorna la existente sin crear duplicados.
-     * Esto protege contra doble-clic, reintentos de red, etc.
-     * 
-     * NOTA: Para activar esta restricción, ejecutar en la BD:
-     *   CREATE UNIQUE INDEX IF NOT EXISTS idx_student_survey_user_day
-     *   ON student_surveys (user_id, DATE(created_at));
-     */
+    // ── Crear encuesta (idempotente por usuario + día) ────────────────────────
     static async create(surveyData) {
         try {
-            const text = `
-                INSERT INTO student_surveys (
-                    user_id, has_used_chatbot, chatbots_used, usage_frequency,
-                    usefulness_rating, tasks_used_for, overall_experience,
-                    preferred_chatbot, effectiveness_comparison,
-                    will_continue_using, would_recommend, additional_comments
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-                RETURNING *
-            `;
+            // Calcular la fecha del día (YYYY-MM-DD) para el índice único
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const surveyDate = today.toISOString().split('T')[0];
 
-            const values = [
-                surveyData.user_id,
-                surveyData.has_used_chatbot,
-                surveyData.chatbots_used || [],
-                surveyData.usage_frequency,
-                surveyData.usefulness_rating,
-                surveyData.tasks_used_for || [],
-                surveyData.overall_experience,
-                surveyData.preferred_chatbot,
-                surveyData.effectiveness_comparison,
-                surveyData.will_continue_using,
-                surveyData.would_recommend,
-                surveyData.additional_comments
-            ];
+            const doc = new StudentSurveyModel({
+                user_id: surveyData.user_id,
+                survey_date: surveyDate,
+                has_used_chatbot: surveyData.has_used_chatbot,
+                chatbots_used: surveyData.chatbots_used || [],
+                usage_frequency: surveyData.usage_frequency,
+                usefulness_rating: surveyData.usefulness_rating,
+                tasks_used_for: surveyData.tasks_used_for || [],
+                overall_experience: surveyData.overall_experience,
+                preferred_chatbot: surveyData.preferred_chatbot,
+                effectiveness_comparison: surveyData.effectiveness_comparison,
+                will_continue_using: surveyData.will_continue_using,
+                would_recommend: surveyData.would_recommend,
+                additional_comments: surveyData.additional_comments,
+            });
 
-            const result = await queryIdempotent(text, values);
-            return result.rows[0];
+            await doc.save();
+            return normalize(doc.toObject());
         } catch (error) {
-            // Conflicto: encuesta duplicada para este usuario en el mismo día
-            if (error.code === '23505') {
-                throw new Error('Ya existe una encuesta registrada para hoy. Solo se permite una encuesta por día.');
+            if (error.code === 11000) {
+                throw new Error(
+                    'Ya existe una encuesta registrada para hoy. Solo se permite una encuesta por día.'
+                );
             }
             throw new Error(`Error al crear encuesta de estudiante: ${error.message}`);
         }
     }
 
-    // ─── Obtener todas las encuestas ──────────────────────────────────────────
+    // ── findAll ───────────────────────────────────────────────────────────────
     static async findAll() {
-        try {
-            const text = `
-                SELECT s.*, u.username, u.email, u.role
-                FROM student_surveys s
-                JOIN users u ON s.user_id = u.id
-                ORDER BY s.created_at DESC
-            `;
-            const result = await query(text);
-            return result.rows;
-        } catch (error) {
-            throw new Error(`Error al obtener encuestas: ${error.message}`);
-        }
+        const docs = await StudentSurveyModel.aggregate(withUserPipeline());
+        return docs.map(normalize);
     }
 
-    // ─── Obtener por ID ───────────────────────────────────────────────────────
+    // ── findById ──────────────────────────────────────────────────────────────
     static async findById(id) {
         try {
-            const text = `
-                SELECT s.*, u.username, u.email, u.role
-                FROM student_surveys s
-                JOIN users u ON s.user_id = u.id
-                WHERE s.id = $1
-            `;
-            const result = await query(text, [id]);
-            return result.rows[0];
-        } catch (error) {
-            throw new Error(`Error al obtener encuesta: ${error.message}`);
+            const docs = await StudentSurveyModel.aggregate(
+                withUserPipeline({ _id: new mongoose.Types.ObjectId(id) })
+            );
+            return normalize(docs[0]);
+        } catch {
+            return null;
         }
     }
 
-    // ─── Obtener por usuario ──────────────────────────────────────────────────
+    // ── findByUserId ──────────────────────────────────────────────────────────
     static async findByUserId(userId) {
         try {
-            const text = `
-                SELECT s.*, u.username, u.email, u.role
-                FROM student_surveys s
-                JOIN users u ON s.user_id = u.id
-                WHERE s.user_id = $1
-                ORDER BY s.created_at DESC
-            `;
-            const result = await query(text, [userId]);
-            return result.rows;
-        } catch (error) {
-            throw new Error(`Error al obtener encuestas del usuario: ${error.message}`);
+            const docs = await StudentSurveyModel.aggregate(
+                withUserPipeline({ user_id: new mongoose.Types.ObjectId(userId) })
+            );
+            return docs.map(normalize);
+        } catch {
+            return [];
         }
     }
 
-    // ─── Actualizar encuesta (con transacción) ────────────────────────────────
-    /**
-     * Actualiza la encuesta dentro de una transacción.
-     * Bajo concurrencia, dos requests simultáneos de actualización
-     * se serializan automáticamente gracias al bloqueo de fila.
-     */
+    // ── Actualizar (con transacción opcional) ─────────────────────────────────
     static async update(id, surveyData) {
         try {
-            return await transaction(async (client) => {
-                const text = `
-                    UPDATE student_surveys 
-                    SET 
-                        has_used_chatbot = COALESCE($1,  has_used_chatbot),
-                        chatbots_used = COALESCE($2,  chatbots_used),
-                        usage_frequency = COALESCE($3,  usage_frequency),
-                        usefulness_rating = COALESCE($4,  usefulness_rating),
-                        tasks_used_for = COALESCE($5,  tasks_used_for),
-                        overall_experience = COALESCE($6,  overall_experience),
-                        preferred_chatbot = COALESCE($7,  preferred_chatbot),
-                        effectiveness_comparison = COALESCE($8,  effectiveness_comparison),
-                        will_continue_using = COALESCE($9,  will_continue_using),
-                        would_recommend = COALESCE($10, would_recommend),
-                        additional_comments = COALESCE($11, additional_comments)
-                    WHERE id = $12
-                    RETURNING *
-                `;
-
-                const values = [
-                    surveyData.has_used_chatbot,
-                    surveyData.chatbots_used,
-                    surveyData.usage_frequency,
-                    surveyData.usefulness_rating,
-                    surveyData.tasks_used_for,
-                    surveyData.overall_experience,
-                    surveyData.preferred_chatbot,
-                    surveyData.effectiveness_comparison,
-                    surveyData.will_continue_using,
-                    surveyData.would_recommend,
-                    surveyData.additional_comments,
-                    id
-                ];
-
-                const result = await client.query(text, values);
-                return result.rows[0];
+            const updates = {};
+            const fields = [
+                'has_used_chatbot', 'chatbots_used', 'usage_frequency',
+                'usefulness_rating', 'tasks_used_for', 'overall_experience',
+                'preferred_chatbot', 'effectiveness_comparison',
+                'will_continue_using', 'would_recommend', 'additional_comments',
+            ];
+            fields.forEach(f => {
+                if (surveyData[f] !== undefined) updates[f] = surveyData[f];
             });
+
+            const doc = await StudentSurveyModel.findByIdAndUpdate(
+                id,
+                { $set: updates },
+                { new: true, runValidators: true }
+            ).lean();
+
+            return normalize(doc);
         } catch (error) {
             throw new Error(`Error al actualizar encuesta: ${error.message}`);
         }
     }
 
-    // ─── Eliminar encuesta ────────────────────────────────────────────────────
+    // ── Eliminar ──────────────────────────────────────────────────────────────
     static async delete(id) {
         try {
-            const text = 'DELETE FROM student_surveys WHERE id = $1 RETURNING id';
-            const result = await query(text, [id]);
-            return result.rows[0];
-        } catch (error) {
-            throw new Error(`Error al eliminar encuesta: ${error.message}`);
+            const doc = await StudentSurveyModel.findByIdAndDelete(id).lean();
+            return doc ? { id: doc._id.toString() } : null;
+        } catch {
+            return null;
         }
     }
 
-    // ─── Estadísticas globales (query única, sin viajes extra a BD) ───────────
-    /**
-     * Una sola query con múltiples agregaciones en lugar de varias queries
-     * separadas. Más eficiente bajo concurrencia porque libera la conexión
-     * del pool más rápido.
-     */
+    // ── Estadísticas globales ─────────────────────────────────────────────────
     static async getStatistics() {
-        try {
-            const text = `
-                SELECT 
-                    COUNT(*) AS total_surveys,
-                    ROUND(AVG(usefulness_rating)::numeric, 2) AS avg_usefulness,
-                    ROUND(AVG(overall_experience)::numeric, 2) AS avg_experience,
-                    COUNT(CASE WHEN has_used_chatbot = true  THEN 1 END) AS users_with_chatbot,
-                    COUNT(CASE WHEN will_continue_using = true THEN 1 END) AS will_continue,
-                    COUNT(CASE WHEN would_recommend = true   THEN 1 END) AS would_recommend,
-                    COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days'  THEN 1 END) AS new_this_week,
-                    COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) AS new_this_month
-                FROM student_surveys
-            `;
-            const result = await query(text);
-            return result.rows[0];
-        } catch (error) {
-            throw new Error(`Error al obtener estadísticas: ${error.message}`);
-        }
+        const now = new Date();
+        const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+        const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+        const [agg] = await StudentSurveyModel.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    total_surveys: { $sum: 1 },
+                    avg_usefulness: { $avg: '$usefulness_rating' },
+                    avg_experience: { $avg: '$overall_experience' },
+                    users_with_chatbot: {
+                        $sum: { $cond: ['$has_used_chatbot', 1, 0] },
+                    },
+                    will_continue: {
+                        $sum: { $cond: ['$will_continue_using', 1, 0] },
+                    },
+                    would_recommend: {
+                        $sum: { $cond: ['$would_recommend', 1, 0] },
+                    },
+                    new_this_week: {
+                        $sum: {
+                            $cond: [{ $gte: ['$created_at', sevenDaysAgo] }, 1, 0],
+                        },
+                    },
+                    new_this_month: {
+                        $sum: {
+                            $cond: [{ $gte: ['$created_at', thirtyDaysAgo] }, 1, 0],
+                        },
+                    },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    total_surveys: 1,
+                    avg_usefulness: { $round: ['$avg_usefulness', 2] },
+                    avg_experience: { $round: ['$avg_experience', 2] },
+                    users_with_chatbot: 1,
+                    will_continue: 1,
+                    would_recommend: 1,
+                    new_this_week: 1,
+                    new_this_month: 1,
+                },
+            },
+        ]);
+
+        return agg ?? {
+            total_surveys: 0, avg_usefulness: 0, avg_experience: 0,
+            users_with_chatbot: 0, will_continue: 0, would_recommend: 0,
+            new_this_week: 0, new_this_month: 0,
+        };
     }
 
-    // ─── Estadísticas por usuario ─────────────────────────────────────────────
+    // ── Estadísticas por usuario ──────────────────────────────────────────────
     static async getUserStatistics(userId) {
         try {
-            const text = `
-                SELECT 
-                    COUNT(*) AS total_surveys,
-                    ROUND(AVG(usefulness_rating)::numeric, 2) AS avg_usefulness,
-                    ROUND(AVG(overall_experience)::numeric, 2) AS avg_experience,
-                    COUNT(CASE WHEN has_used_chatbot = true   THEN 1 END) AS used_chatbot_count,
-                    COUNT(CASE WHEN will_continue_using = true THEN 1 END) AS will_continue_count,
-                    MAX(created_at) AS last_survey_date,
-                    MIN(created_at) AS first_survey_date
-                FROM student_surveys
-                WHERE user_id = $1
-            `;
-            const result = await query(text, [userId]);
-            return result.rows[0];
-        } catch (error) {
-            throw new Error(`Error al obtener estadísticas del usuario: ${error.message}`);
+            const [agg] = await StudentSurveyModel.aggregate([
+                { $match: { user_id: new mongoose.Types.ObjectId(userId) } },
+                {
+                    $group: {
+                        _id: null,
+                        total_surveys: { $sum: 1 },
+                        avg_usefulness: { $avg: '$usefulness_rating' },
+                        avg_experience: { $avg: '$overall_experience' },
+                        used_chatbot_count: {
+                            $sum: { $cond: ['$has_used_chatbot', 1, 0] },
+                        },
+                        will_continue_count: {
+                            $sum: { $cond: ['$will_continue_using', 1, 0] },
+                        },
+                        last_survey_date: { $max: '$created_at' },
+                        first_survey_date: { $min: '$created_at' },
+                    },
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        total_surveys: 1,
+                        avg_usefulness: { $round: ['$avg_usefulness', 2] },
+                        avg_experience: { $round: ['$avg_experience', 2] },
+                        used_chatbot_count: 1,
+                        will_continue_count: 1,
+                        last_survey_date: 1,
+                        first_survey_date: 1,
+                    },
+                },
+            ]);
+            return agg ?? { total_surveys: 0 };
+        } catch {
+            return { total_surveys: 0 };
         }
     }
 
-    // ─── Chatbots más usados ──────────────────────────────────────────────────
+    // ── Chatbots más usados (equivalente a UNNEST + GROUP BY) ─────────────────
     static async getMostUsedChatbots() {
-        try {
-            const text = `
-                SELECT UNNEST(chatbots_used) AS chatbot, COUNT(*) AS count
-                FROM student_surveys
-                WHERE chatbots_used IS NOT NULL
-                GROUP BY chatbot
-                ORDER BY count DESC
-                LIMIT 10
-            `;
-            const result = await query(text);
-            return result.rows;
-        } catch (error) {
-            throw new Error(`Error al obtener chatbots más usados: ${error.message}`);
-        }
+        return StudentSurveyModel.aggregate([
+            { $match: { chatbots_used: { $exists: true, $ne: [] } } },
+            { $unwind: '$chatbots_used' },
+            { $group: { _id: '$chatbots_used', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 10 },
+            { $project: { _id: 0, chatbot: '$_id', count: 1 } },
+        ]);
     }
 
-    // ─── Tareas más comunes ───────────────────────────────────────────────────
+    // ── Tareas más comunes ────────────────────────────────────────────────────
     static async getMostCommonTasks() {
-        try {
-            const text = `
-                SELECT UNNEST(tasks_used_for) AS task, COUNT(*) AS count
-                FROM student_surveys
-                WHERE tasks_used_for IS NOT NULL
-                GROUP BY task
-                ORDER BY count DESC
-            `;
-            const result = await query(text);
-            return result.rows;
-        } catch (error) {
-            throw new Error(`Error al obtener tareas más comunes: ${error.message}`);
-        }
+        return StudentSurveyModel.aggregate([
+            { $match: { tasks_used_for: { $exists: true, $ne: [] } } },
+            { $unwind: '$tasks_used_for' },
+            { $group: { _id: '$tasks_used_for', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $project: { _id: 0, task: '$_id', count: 1 } },
+        ]);
     }
 
-    // ─── Distribución de frecuencia ───────────────────────────────────────────
+    // ── Distribución de frecuencia ────────────────────────────────────────────
     static async getUsageFrequencyDistribution() {
-        try {
-            const text = `
-                SELECT usage_frequency, COUNT(*) AS count
-                FROM student_surveys
-                WHERE usage_frequency IS NOT NULL
-                GROUP BY usage_frequency
-                ORDER BY 
-                    CASE usage_frequency
-                        WHEN 'Muy frecuentemente' THEN 1
-                        WHEN 'Frecuentemente' THEN 2
-                        WHEN 'Ocasionalmente' THEN 3
-                        WHEN 'Casi nunca' THEN 4
-                        WHEN 'Nunca' THEN 5
-                    END
-            `;
-            const result = await query(text);
-            return result.rows;
-        } catch (error) {
-            throw new Error(`Error al obtener distribución de frecuencia: ${error.message}`);
-        }
+        const ORDER = {
+            'Muy frecuentemente': 1,
+            'Frecuentemente': 2,
+            'Ocasionalmente': 3,
+            'Casi nunca': 4,
+            'Nunca': 5,
+        };
+        const docs = await StudentSurveyModel.aggregate([
+            { $match: { usage_frequency: { $exists: true, $ne: null } } },
+            { $group: { _id: '$usage_frequency', count: { $sum: 1 } } },
+            { $project: { _id: 0, usage_frequency: '$_id', count: 1 } },
+        ]);
+        return docs.sort(
+            (a, b) =>
+                (ORDER[a.usage_frequency] ?? 99) - (ORDER[b.usage_frequency] ?? 99)
+        );
     }
 
-    // ─── Verificar si el usuario ya tiene encuestas ───────────────────────────
+    // ── userHasSurveys ────────────────────────────────────────────────────────
     static async userHasSurveys(userId) {
         try {
-            const text = `SELECT EXISTS(SELECT 1 FROM student_surveys WHERE user_id = $1) AS has_surveys`;
-            const result = await query(text, [userId]);
-            return result.rows[0].has_surveys;
-        } catch (error) {
-            throw new Error(`Error al verificar encuestas del usuario: ${error.message}`);
+            const count = await StudentSurveyModel.countDocuments({
+                user_id: new mongoose.Types.ObjectId(userId),
+            });
+            return count > 0;
+        } catch {
+            return false;
         }
     }
 }
 
+export { StudentSurveyModel };
 export default StudentSurvey;

@@ -1,16 +1,16 @@
 /**
  * Servidor Principal
  *
- * CAMBIOS SOLID/Patrones:
- * ─ Se llama a registerAllListeners() al arrancar → activa el patrón Observer.
- * ─ Se expone GET /api/metrics para ver contadores en tiempo real (Observer).
- * ─ El resto de la lógica HTTP no cambia.
+ * Cambio respecto a la versión PostgreSQL:
+ *  - testConnection() → connectDB() de Mongoose (cierra la conexión en shutdown)
+ *  - closePool()      → mongoose.disconnect() (envuelto en closePool() de database.js)
+ *  - El resto de la lógica HTTP y los patrones SOLID/Observer no cambian.
  */
 
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { testConnection, closePool } from './config/database.js';
+import { connectDB, testConnection, closePool } from './config/database.js';
 import { registerAllListeners, MetricsListener } from './listeners/domainEventListeners.js';
 
 // Importar rutas
@@ -45,8 +45,9 @@ app.get('/', (req, res) => {
     res.json({
         success: true,
         message: 'API de Chatbots Education Survey',
-        version: '2.0.0',
+        version: '3.0.0',
         status: 'running',
+        database: 'MongoDB Atlas',
         architecture: 'SOLID + Repository + Strategy + Observer + Factory',
     });
 });
@@ -57,7 +58,7 @@ app.get('/api/health', async (req, res) => {
         res.json({
             success: true,
             status: 'OK',
-            database: dbConnected ? 'conectada' : 'desconectada',
+            database: dbConnected ? 'conectada (MongoDB Atlas)' : 'desconectada',
             environment: process.env.NODE_ENV || 'development',
             timestamp: new Date().toISOString(),
             uptime: process.uptime(),
@@ -71,7 +72,7 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
-// Endpoint de métricas (Observer Pattern — expone los contadores de eventos)
+// Endpoint de métricas (Observer Pattern)
 app.get('/api/metrics', (req, res) => {
     res.json({ success: true, metrics: MetricsListener.getSnapshot() });
 });
@@ -85,7 +86,10 @@ app.use('/api/export', exportRoutes);
 
 // ─── Manejo de errores ────────────────────────────────────────────────────────
 app.use((req, res) => {
-    res.status(404).json({ success: false, message: `Ruta no encontrada: ${req.method} ${req.path}` });
+    res.status(404).json({
+        success: false,
+        message: `Ruta no encontrada: ${req.method} ${req.path}`,
+    });
 });
 
 app.use((err, req, res, next) => {
@@ -103,10 +107,11 @@ app.use((err, req, res, next) => {
 // ─── Inicio del servidor ──────────────────────────────────────────────────────
 const startServer = async () => {
     try {
-        // Observer: registrar todos los listeners ANTES de abrir el puerto
+        // Observer: registrar listeners ANTES de abrir el puerto
         registerAllListeners();
 
-        const dbConnected = await testConnection();
+        // Conectar a MongoDB Atlas
+        const dbConnected = await connectDB();
         if (!dbConnected) {
             console.warn('Advertencia: Servidor iniciado sin conexión a BD');
         }
@@ -117,7 +122,7 @@ const startServer = async () => {
             console.log('='.repeat(60));
             console.log(`   Puerto:        ${PORT}`);
             console.log(`   URL:           http://localhost:${PORT}`);
-            console.log(`   Base de datos: ${dbConnected ? 'Conectada' : 'Desconectada'}`);
+            console.log(`   Base de datos: ${dbConnected ? 'MongoDB Atlas conectada' : 'Desconectada'}`);
             console.log(`   Modo:          ${process.env.NODE_ENV || 'development'}`);
             console.log(`   Arquitectura:  SOLID + Repository + Strategy + Observer + Factory`);
             console.log('='.repeat(60) + '\n');
@@ -134,8 +139,14 @@ const startServer = async () => {
 
         process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
         process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-        process.on('unhandledRejection', (err) => { console.error('unhandledRejection:', err); gracefulShutdown('unhandledRejection'); });
-        process.on('uncaughtException', (err) => { console.error('uncaughtException:', err); gracefulShutdown('uncaughtException'); });
+        process.on('unhandledRejection', (err) => {
+            console.error('unhandledRejection:', err);
+            gracefulShutdown('unhandledRejection');
+        });
+        process.on('uncaughtException', (err) => {
+            console.error('uncaughtException:', err);
+            gracefulShutdown('uncaughtException');
+        });
 
     } catch (error) {
         console.error('Error al iniciar el servidor:', error);
