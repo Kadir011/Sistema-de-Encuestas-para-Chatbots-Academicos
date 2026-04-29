@@ -9,7 +9,7 @@
 [![React](https://img.shields.io/badge/React-19.2.0-61dafb?style=for-the-badge&logo=react&logoColor=white&labelColor=0d1117)](https://react.dev/)
 [![Node.js](https://img.shields.io/badge/Node.js-22.x-6cc24a?style=for-the-badge&logo=node.js&logoColor=white&labelColor=0d1117)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express-5.2.1-ffffff?style=for-the-badge&logo=express&logoColor=white&labelColor=0d1117)](https://expressjs.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-336791?style=for-the-badge&logo=postgresql&logoColor=white&labelColor=0d1117)](https://postgresql.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB_Atlas-8.x-47A248?style=for-the-badge&logo=mongodb&logoColor=white&labelColor=0d1117)](https://www.mongodb.com/atlas)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.x-38bdf8?style=for-the-badge&logo=tailwindcss&logoColor=white&labelColor=0d1117)](https://tailwindcss.com/)
 [![License](https://img.shields.io/badge/License-Proprietary-ef4444?style=for-the-badge&labelColor=0d1117)](.)
 
@@ -25,7 +25,7 @@
 
 > **Recopila · Analiza · Visualiza** el uso de IA en la educación
 >
-> *Backend refactorizado con principios **SOLID** y patrones de diseño profesionales — v2.0*
+> *Backend con principios **SOLID**, patrones de diseño profesionales y base de datos **MongoDB Atlas** — v3.0*
 
 </div>
 
@@ -89,7 +89,7 @@
 |---|---|---|
 | ![Node.js](https://img.shields.io/badge/-Node.js-6cc24a?logo=node.js&logoColor=white&style=flat-square) Node.js | `≥ 18.x` | Runtime |
 | ![Express](https://img.shields.io/badge/-Express-ffffff?logo=express&logoColor=black&style=flat-square) Express | `5.2.1` | Web framework |
-| ![PostgreSQL](https://img.shields.io/badge/-PostgreSQL-336791?logo=postgresql&logoColor=white&style=flat-square) PostgreSQL | `≥ 14.x` | Base de datos relacional |
+| ![MongoDB](https://img.shields.io/badge/-MongoDB_Atlas-47A248?logo=mongodb&logoColor=white&style=flat-square) Mongoose | `9.6.0` | ODM + MongoDB Atlas |
 | ![JWT](https://img.shields.io/badge/-JWT-000000?logo=jsonwebtokens&logoColor=white&style=flat-square) JWT | `9.0.3` | Autenticación |
 | ![bcrypt](https://img.shields.io/badge/-bcrypt-f97316?style=flat-square) Bcrypt | `6.0.0` | Hash de contraseñas |
 | ![CORS](https://img.shields.io/badge/-CORS-3b82f6?style=flat-square) CORS | `2.8.5` | Cross-origin requests |
@@ -105,40 +105,40 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                           FRONTEND                                   │
+│                           FRONTEND                                  │
 │              React SPA  ·  Context API  ·  Custom Hooks             │
 │           Tailwind CSS  ·  Chart.js  ·  React Router DOM            │
 └────────────────────────────┬────────────────────────────────────────┘
                              │  REST API  (HTTPS / JSON)
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                   BACKEND  (SOLID + Design Patterns)                 │
-│                                                                      │
-│  ┌──────────────┐  ┌──────────────────┐  ┌──────────────────────┐  │
-│  │  Controllers │  │   Middlewares    │  │       Routes         │  │
-│  │  (Thin)      │  │ auth · validate  │  │  idempotency layer   │  │
-│  └──────┬───────┘  └──────────────────┘  └──────────────────────┘  │
-│         │ calls                                                       │
+│                   BACKEND  (SOLID + Design Patterns)                │
+│                                                                     │
+│  ┌──────────────┐  ┌──────────────────┐  ┌──────────────────────┐   │
+│  │  Controllers │  │   Middlewares    │  │       Routes         │   │
+│  │  (Thin)      │  │ auth · validate  │  │  idempotency layer   │   │
+│  └──────┬───────┘  └──────────────────┘  └──────────────────────┘   │
+│         │ calls                                                     │
 │  ┌──────▼───────┐  ┌──────────────────┐                             │
 │  │   Services   │  │  EventEmitterBus │  ← Observer Pattern         │
 │  │  AuthService │  │  (Domain Events) │                             │
 │  │ SurveyService│  └──────────────────┘                             │
-│  └──────┬───────┘                                                    │
-│         │ depends on (DIP)                                           │
+│  └──────┬───────┘                                                   │
+│         │ depends on (DIP)                                          │
 │  ┌──────▼───────┐  ┌──────────────────┐                             │
 │  │ Repositories │  │  Validators      │  ← Strategy Pattern         │
 │  │  (Interface) │  │ ValidatorFactory │                             │
 │  └──────┬───────┘  └──────────────────┘                             │
-│         │                                                            │
-│  ┌──────▼───────┐                                                    │
-│  │    Models    │  ← Idempotent queries · Transactions               │
-│  └──────────────┘                                                    │
+│         │                                                           │
+│  ┌──────▼───────┐                                                   │
+│  │    Models    │  ← Mongoose Schemas · Unique Indexes · Aggregation│
+│  └──────────────┘                                                   │
 └────────────────────────────┬────────────────────────────────────────┘
-                             │  Parameterized Queries
+                             │  Mongoose ODM
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                          POSTGRESQL                                   │
-│   Neon/Render  ·  Connection Pool  ·  Indexes  ·  UNIQUE constraints │
+│                        MONGODB ATLAS                                │
+│   Cloud  ·  Connection Pool  ·  Unique Indexes  ·  Aggregation      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -161,7 +161,7 @@
 | Patrón | Implementación |
 |---|---|
 | 🏭 **Factory Method** | `SurveyRepositoryFactory.create(type)` y `SurveyServiceFactory.create(type)` encapsulan la creación de objetos según el tipo (`student` / `teacher`). |
-| 📦 **Repository** | `StudentSurveyRepository`, `TeacherSurveyRepository` y `UserRepository` abstraen el acceso a datos. Los servicios trabajan contra la interfaz; sustituir PostgreSQL no requiere tocar la lógica de negocio. |
+| 📦 **Repository** | `StudentSurveyRepository`, `TeacherSurveyRepository` y `UserRepository` abstraen el acceso a datos. Los servicios trabajan contra la interfaz; sustituir MongoDB no requiere tocar la lógica de negocio. |
 | 🔔 **Observer** | `DomainEventBus` (singleton `EventEmitter`) actúa como bus central. Los servicios publican eventos (`USER_REGISTERED`, `STUDENT_SURVEY_CREATED`…) sin saber quién escucha. `AuditListener` y `MetricsListener` se suscriben al arranque. `GET /api/metrics` expone los contadores en tiempo real. |
 | 🎯 **Strategy** | `ValidationService` define reglas intercambiables (`RequiredFieldRule`, `EmailFormatRule`, `RangeRule`, `ConditionalRule`…) con interfaz `{ validate(data) }`. `ValidatorFactory` compone las estrategias correctas por caso de uso. |
 | 🔗 **Middleware Pipeline** | Cada request atraviesa: `verifyToken` → `idempotencyMiddleware` → `sanitizeInput` → `validateXxx` → `ctrl.action`. Cada middleware tiene una sola responsabilidad y es reutilizable. |
@@ -176,25 +176,24 @@ chatbots-survey-platform/
 │
 ├── 📂 backend/
 │   ├── 📂 config/
-│   │   └── database.js              ← Pool · query · transaction · queryParallel
+│   │   └── database.js              ← connectDB · transaction · queryParallel (Mongoose)
 │   ├── 📂 controllers/
 │   │   ├── authController.js        ← Thin Controller → AuthService
 │   │   ├── surveyController.js      ← Thin Controller genérico (OCP)
 │   │   ├── userController.js
-│   │   └── exportController.js      ← Queries paralelas con Promise.all
-│   ├── 📂 database/
-│   │   ├── init.sql                 ← Esquema + índices + seed admin
-│   │   └── migration_idempotency_concurrency.sql
+│   │   └── exportController.js      ← Aggregations paralelas con Promise.all
+│   ├── 📂 databases/
+│   │   └── seed.js                  ← Crea el usuario admin (idempotente)
 │   ├── 📂 listeners/
 │   │   └── domainEventListeners.js  ← Observer: AuditListener + MetricsListener
 │   ├── 📂 middlewares/
-│   │   ├── authMiddleware.js        ← JWT · roles · ownership
+│   │   ├── authMiddleware.js        ← JWT · roles · ownership (ObjectId)
 │   │   ├── idempotencyMiddleware.js ← Cache HTTP por Idempotency-Key
 │   │   └── validationMiddleware.js  ← Strategy: ValidatorFactory
 │   ├── 📂 models/
-│   │   ├── User.js                  ← ON CONFLICT DO NOTHING/UPDATE · bcrypt
-│   │   ├── StudentSurvey.js         ← Idempotent inserts · transactions
-│   │   └── TeacherSurvey.js
+│   │   ├── User.js                  ← Mongoose Schema · unique indexes · bcrypt hook
+│   │   ├── StudentSurvey.js         ← Schema · unique(user_id, survey_date) · aggregation
+│   │   └── TeacherSurvey.js         ← Schema · unique(user_id, survey_date) · aggregation
 │   ├── 📂 repositories/
 │   │   ├── SurveyRepository.js      ← ISurveyRepository · Factory (LSP + DIP)
 │   │   └── UserRepository.js        ← IUserRepository (DIP)
@@ -209,7 +208,7 @@ chatbots-survey-platform/
 │   │   ├── SurveyService.js         ← SRP · OCP · Observer · Factory
 │   │   ├── ValidationService.js     ← Strategy · Factory · OCP
 │   │   └── EventEmitterService.js   ← Observer: DomainEventBus singleton
-│   └── server.js                    ← Arranque · registerAllListeners · /api/metrics
+│   └── server.js                    ← Arranque · connectDB · registerAllListeners · /api/metrics
 │
 ├── 📂 frontend/
 │   └── 📂 src/
@@ -220,7 +219,6 @@ chatbots-survey-platform/
 │       ├── 📂 services/             ← api.js · surveyService · authService · exportService
 │       └── 📂 utils/                ← validators · formatters · constants · helpers
 │
-├── setup.sh
 └── README.md
 ```
 
@@ -231,23 +229,13 @@ chatbots-survey-platform/
 ### Requisitos Previos
 
 > [!IMPORTANT]
-> Asegúrate de tener instalados los siguientes requisitos antes de continuar.
+> No se necesita ninguna base de datos local. MongoDB Atlas es completamente cloud.
 
 - **Node.js** `18.x+`
-- **PostgreSQL** `14.x+` (local) o cuenta en [Neon](https://neon.tech)
-- **npm** o **yarn**
+- **npm**
+- Cuenta gratuita en [MongoDB Atlas](https://www.mongodb.com/atlas) (o usar el connection string ya configurado)
 
-### Instalación rápida (script automático)
-
-```bash
-git clone https://github.com/Kadir011/Sistema-de-Encuestas-para-Chatbots-Acad-micos.git
-cd Sistema-de-Encuestas-para-Chatbots-Acad-micos
-chmod +x setup.sh && ./setup.sh
-```
-
-El script instala dependencias, crea la base de datos, ejecuta `init.sql` (tablas + índices de idempotencia + usuario admin) y genera los archivos `.env`.
-
-### Instalación manual
+### Instalación
 
 **1. Clonar el repositorio**
 
@@ -269,21 +257,22 @@ cd ../frontend && npm install
 <summary><b>🔐 Backend — <code>backend/.env</code></b></summary>
 
 ```env
-PORT=5000
-NODE_ENV=development
-
-# PostgreSQL (Neon o local)
-DATABASE_URL=postgresql://[user]:[password]@[host]/[database]?sslmode=require
+# ─── MongoDB Atlas ────────────────────────────────────────────
+DATABASE_URL=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?appName=MyCluster
 DB_POOL_MAX=10
 DB_IDLE_TIMEOUT=30000
 DB_CONN_TIMEOUT=5000
 
-# JWT
-JWT_SECRET=[tu_jwt_secret_seguro]
+# ─── JWT ──────────────────────────────────────────────────────
+JWT_SECRET=tu_jwt_secret_seguro
 JWT_EXPIRE=7d
 
-# CORS
-FRONTEND_URL=https://chatbot-surveys-frontend.vercel.app
+# ─── Servidor ─────────────────────────────────────────────────
+PORT=5000
+NODE_ENV=development
+
+# ─── CORS ─────────────────────────────────────────────────────
+FRONTEND_URL=http://localhost:5173
 ```
 
 </details>
@@ -292,16 +281,18 @@ FRONTEND_URL=https://chatbot-surveys-frontend.vercel.app
 <summary><b>🌐 Frontend — <code>frontend/.env</code></b></summary>
 
 ```env
-VITE_API_URL=https://chatbot-surveys-backend.onrender.com/api
+VITE_API_URL=http://localhost:5000/api
 ```
 
 </details>
 
-**4. Inicializar la base de datos**
+**4. Crear el usuario administrador**
 
 ```bash
-psql -U postgres -d tu_database -f backend/database/init.sql
+cd backend && npm run seed
 ```
+
+Este comando es idempotente: si el admin ya existe, no hace nada.
 
 **5. Ejecutar en desarrollo**
 
@@ -348,7 +339,7 @@ Role:     Administrador
 | `GET` | `/statistics` | `student` `admin` | Estadísticas enriquecidas |
 | `GET` | `/my-statistics` | `student` | Estadísticas personales detalladas |
 | `GET` | `/:id` | `student` `admin` | Obtener encuesta por ID |
-| `PUT` | `/:id` | `student` `admin` | Actualizar (transacción concurrente) |
+| `PUT` | `/:id` | `student` `admin` | Actualizar encuesta |
 | `DELETE` | `/:id` | `student` `admin` | Eliminar encuesta |
 
 ### Encuestas Profesores — `/api/teacher-surveys`
@@ -360,7 +351,7 @@ Role:     Administrador
 | `GET` | `/my-surveys` | `teacher` `admin` | Mis encuestas |
 | `GET` | `/statistics` | `teacher` `admin` | Estadísticas enriquecidas |
 | `GET` | `/:id` | `teacher` `admin` | Obtener encuesta por ID |
-| `PUT` | `/:id` | `teacher` `admin` | Actualizar (transacción concurrente) |
+| `PUT` | `/:id` | `teacher` `admin` | Actualizar encuesta |
 | `DELETE` | `/:id` | `teacher` `admin` | Eliminar encuesta |
 
 ### Usuarios — `/api/users`
@@ -380,7 +371,7 @@ Role:     Administrador
 |:---:|---|---|
 | `GET` | `/student-surveys` | Datos de encuestas de estudiantes (JSON → Excel en cliente) |
 | `GET` | `/teacher-surveys` | Datos de encuestas de profesores (JSON → Excel en cliente) |
-| `GET` | `/statistics` | Estadísticas con queries paralelas (`Promise.all`) |
+| `GET` | `/statistics` | Estadísticas con aggregations paralelas (`Promise.all`) |
 
 ### Métricas — `/api/metrics`
 
@@ -392,94 +383,100 @@ Role:     Administrador
 
 ## Esquema de Base de Datos
 
-<details>
-<summary><b>👤 Tabla <code>users</code></b></summary>
+Los modelos están definidos como **Mongoose Schemas** sobre **MongoDB Atlas** (base de datos `chatbots_system`).
 
-```sql
-CREATE TABLE users (
-    id          SERIAL PRIMARY KEY,
-    username    VARCHAR(50)  UNIQUE NOT NULL,
-    email       VARCHAR(255) UNIQUE NOT NULL,
-    password    VARCHAR(255) NOT NULL,           -- bcrypt, 10 rounds
-    role        VARCHAR(20)  NOT NULL CHECK (role IN ('student', 'teacher', 'admin')),
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+<details>
+<summary><b>👤 Collection <code>users</code></b></summary>
+
+```js
+{
+  username:   String  // unique, 3-50 chars
+  email:      String  // unique, lowercase
+  password:   String  // bcrypt, 10 rounds (pre-save hook)
+  role:       String  // enum: 'student' | 'teacher' | 'admin'
+  created_at: Date    // auto (timestamps)
+}
 ```
 
 </details>
 
 <details>
-<summary><b>🎓 Tabla <code>student_surveys</code></b></summary>
+<summary><b>🎓 Collection <code>student_surveys</code></b></summary>
 
-```sql
-CREATE TABLE student_surveys (
-    id                       SERIAL PRIMARY KEY,
-    user_id                  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    has_used_chatbot         BOOLEAN NOT NULL,
-    chatbots_used            TEXT[],
-    usage_frequency          VARCHAR(50),
-    usefulness_rating        INTEGER CHECK (usefulness_rating BETWEEN 1 AND 5),
-    tasks_used_for           TEXT[],
-    overall_experience       INTEGER CHECK (overall_experience BETWEEN 1 AND 5),
-    preferred_chatbot        VARCHAR(100),
-    effectiveness_comparison VARCHAR(100),
-    will_continue_using      BOOLEAN,
-    would_recommend          BOOLEAN,
-    additional_comments      TEXT,
-    created_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+```js
+{
+  user_id:                  ObjectId  // ref: User
+  survey_date:              String    // YYYY-MM-DD (índice de idempotencia)
+  has_used_chatbot:         Boolean
+  chatbots_used:            [String]
+  usage_frequency:          String
+  usefulness_rating:        Number    // 1-5
+  tasks_used_for:           [String]
+  overall_experience:       Number    // 1-5
+  preferred_chatbot:        String
+  effectiveness_comparison: String
+  will_continue_using:      Boolean
+  would_recommend:          Boolean
+  additional_comments:      String
+  created_at:               Date
+}
 ```
 
 </details>
 
 <details>
-<summary><b>👨‍🏫 Tabla <code>teacher_surveys</code></b></summary>
+<summary><b>👨‍🏫 Collection <code>teacher_surveys</code></b></summary>
 
-```sql
-CREATE TABLE teacher_surveys (
-    id                    SERIAL PRIMARY KEY,
-    user_id               INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    has_used_chatbot      BOOLEAN NOT NULL,
-    chatbots_used         TEXT[],
-    courses_used          TEXT[],
-    purposes              TEXT[],
-    outcomes              TEXT[],
-    challenges            TEXT[],
-    likelihood_future_use VARCHAR(50),
-    advantages            TEXT[],
-    concerns              TEXT[],
-    resources_needed      TEXT[],
-    would_recommend       BOOLEAN,
-    age_range             VARCHAR(50),
-    institution_type      VARCHAR(100),
-    countries             TEXT[],
-    years_experience      VARCHAR(50),
-    additional_comments   TEXT,
-    created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+```js
+{
+  user_id:              ObjectId  // ref: User
+  survey_date:          String    // YYYY-MM-DD (índice de idempotencia)
+  has_used_chatbot:     Boolean
+  chatbots_used:        [String]
+  courses_used:         [String]
+  purposes:             [String]
+  outcomes:             [String]
+  challenges:           [String]
+  likelihood_future_use: String
+  advantages:           [String]
+  concerns:             [String]
+  resources_needed:     [String]
+  would_recommend:      Boolean
+  age_range:            String
+  institution_type:     String
+  countries:            [String]
+  years_experience:     String
+  additional_comments:  String
+  created_at:           Date
+}
 ```
 
 </details>
 
 **Índices de rendimiento:**
 
-```sql
-CREATE INDEX idx_users_email              ON users(email);
-CREATE INDEX idx_users_role               ON users(role);
-CREATE INDEX idx_student_surveys_user_id  ON student_surveys(user_id);
-CREATE INDEX idx_teacher_surveys_user_id  ON teacher_surveys(user_id);
-CREATE INDEX idx_student_surveys_created  ON student_surveys(created_at DESC);
-CREATE INDEX idx_teacher_surveys_created  ON teacher_surveys(created_at DESC);
+```js
+// users
+{ email: 1 }
+{ role: 1 }
+
+// student_surveys
+{ user_id: 1 }
+{ created_at: -1 }
+
+// teacher_surveys
+{ user_id: 1 }
+{ created_at: -1 }
 ```
 
 **Índices de idempotencia** (una encuesta por usuario por día):
 
-```sql
-CREATE UNIQUE INDEX idx_student_survey_user_day
-    ON student_surveys (user_id, DATE(created_at));
+```js
+// student_surveys — equivalente al UNIQUE INDEX idx_student_survey_user_day de PostgreSQL
+{ user_id: 1, survey_date: 1 }  unique: true
 
-CREATE UNIQUE INDEX idx_teacher_survey_user_day
-    ON teacher_surveys (user_id, DATE(created_at));
+// teacher_surveys
+{ user_id: 1, survey_date: 1 }  unique: true
 ```
 
 ---
@@ -489,13 +486,13 @@ CREATE UNIQUE INDEX idx_teacher_survey_user_day
 | Mecanismo | Descripción |
 |---|---|
 | 🔑 **JWT** | Tokens firmados con `JWT_SECRET`, expiración configurable (por defecto 7 días). |
-| 🔐 **Bcrypt** | Hash de contraseñas con 10 rondas de salt. Sin almacenamiento en texto plano. |
+| 🔐 **Bcrypt** | Hash de contraseñas con 10 rondas de salt mediante pre-save hook de Mongoose. Sin almacenamiento en texto plano. |
 | 🛡️ **CORS** | Orígenes permitidos configurables vía variable de entorno `FRONTEND_URL`. |
-| 👮 **Role-Based Access** | Middlewares `verifyAdmin`, `verifyTeacher`, `verifyStudent` y `verifyOwnership`. |
+| 👮 **Role-Based Access** | Middlewares `verifyAdmin`, `verifyTeacher`, `verifyStudent` y `verifyOwnership`. IDs comparados como strings de ObjectId. |
 | ✅ **Input Validation** | Strategy Pattern: reglas composables e independientes. Sanitización XSS en todos los endpoints. |
-| 💉 **SQL Injection** | Parameterized Queries en todas las consultas. Sin concatenación de strings. |
+| 💉 **NoSQL Injection** | Consultas con Mongoose (parameterizadas por diseño). Sin concatenación de strings en queries. |
 | 🔁 **Idempotency-Key** | Header HTTP opcional en POST críticos. Cachea la respuesta 24 h y devuelve el mismo resultado ante reintentos o doble-clic. |
-| 🗃️ **ON CONFLICT** | `INSERT … ON CONFLICT DO NOTHING/UPDATE` en `User`. Protege contra duplicados bajo carga concurrente. |
+| 🗃️ **Unique Index** | `{ user_id, survey_date }` en las colecciones de encuestas. Error `11000` capturado en la capa de modelo. |
 
 ---
 
@@ -503,22 +500,23 @@ CREATE UNIQUE INDEX idx_teacher_survey_user_day
 
 | Mecanismo | Descripción |
 |---|---|
-| **Pool de conexiones** | Hasta `DB_POOL_MAX` (por defecto 10) conexiones simultáneas. Cada request obtiene su propia conexión sin bloqueos. |
-| **Transacciones con reintentos** | `transaction(callback, maxRetries)` detecta `40001` (serialization failure) y `40P01` (deadlock) y reintenta con backoff exponencial: 100 ms → 200 ms → 400 ms. |
-| **Queries paralelas** | `exportStatistics`, `AuthService.register` y `SurveyService.getEnrichedStatistics` usan `Promise.all` para lanzar múltiples queries simultáneamente. |
-| **UNIQUE index por día** | Previene encuestas duplicadas incluso si dos requests con los mismos datos llegan en el mismo milisegundo. |
+| **Pool de conexiones** | Hasta `DB_POOL_MAX` (por defecto 10) conexiones simultáneas gestionadas por Mongoose internamente. |
+| **Transacciones con reintentos** | `transaction(callback, maxRetries)` usa `session.withTransaction()`. Detecta `WriteConflict` (código `112`) y `TransientTransactionError` y reintenta con backoff exponencial: 100 ms → 200 ms → 400 ms. |
+| **Aggregations paralelas** | `exportStatistics`, `AuthService.register` y `SurveyService.getEnrichedStatistics` usan `Promise.all` para lanzar múltiples operaciones simultáneamente. |
+| **Unique index por día** | `{ user_id, survey_date }` previene encuestas duplicadas incluso si dos requests con los mismos datos llegan en el mismo milisegundo. |
 
 ---
 
 ## Despliegue
 
-### Backend — Render + Neon
+### Backend — Render + MongoDB Atlas
 
 ```
-1. Crear base de datos PostgreSQL en Neon (https://neon.tech)
+1. Crear cluster gratuito en MongoDB Atlas (https://cloud.mongodb.com)
 2. Crear un Web Service en Render (https://render.com)
 3. Configurar las variables de entorno en el dashboard de Render
-4. Ejecutar init.sql en la base de datos Neon
+4. En el primer deploy, ejecutar el seed manualmente:
+   cd backend && npm run seed
 5. Deploy automático desde la rama main
 ```
 
@@ -534,7 +532,7 @@ CREATE UNIQUE INDEX idx_teacher_survey_user_day
 
 | Variable | Descripción |
 |---|---|
-| `DATABASE_URL` | PostgreSQL connection string (Neon) |
+| `DATABASE_URL` | MongoDB Atlas connection string |
 | `JWT_SECRET` | Clave secreta para firmar JWT |
 | `DB_POOL_MAX` | Máximo de conexiones del pool (recomendado: 10) |
 | `FRONTEND_URL` | URL del frontend (CORS) |
@@ -562,6 +560,6 @@ CREATE UNIQUE INDEX idx_teacher_survey_user_day
 
 ---
 
-<sub>Made with ❤️ by Kadir Barquet · ChatBot Survey Platform © 2025 · v2.0 — SOLID + Repository + Strategy + Observer + Factory</sub>
+<sub>Made with ❤️ by Kadir Barquet · ChatBot Survey Platform © 2025 · v3.0 — SOLID + Repository + Strategy + Observer + Factory + MongoDB Atlas</sub>
 
 </div>
