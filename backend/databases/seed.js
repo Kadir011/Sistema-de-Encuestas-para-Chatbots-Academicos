@@ -1,52 +1,39 @@
 /**
- * Seed — Crea el usuario administrador por defecto en MongoDB.
+ * Seed — Crea el usuario administrador por defecto en PostgreSQL.
  *
- * Equivale al INSERT INTO users del init.sql de PostgreSQL.
- * Es idempotente: si el admin ya existe, no hace nada.
+ * Idempotente: si el admin ya existe, no hace nada (ON CONFLICT DO NOTHING).
+ * Requiere que init.sql ya se haya ejecutado sobre la base de datos.
  *
  * Ejecutar una sola vez:
- *   node database/seed.js
+ *   node databases/seed.js
  *   o con npm:
  *   npm run seed
  */
 
-import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
+import { pool, closePool } from '../config/database.js';
 
 dotenv.config();
 
-const userSchema = new mongoose.Schema(
-    {
-        username: String,
-        email: { type: String, unique: true },
-        password: String,
-        role: String,
-    },
-    { timestamps: { createdAt: 'created_at', updatedAt: false }, versionKey: false }
-);
-
-const User = mongoose.model('User', userSchema, 'users');
-
 const seed = async () => {
     try {
-        await mongoose.connect(process.env.DATABASE_URL, { dbName: 'chatbots_system' });
-        console.log('Conectado a MongoDB Atlas');
+        const { rows: existing } = await pool.query(
+            'SELECT id FROM users WHERE email = $1', ['admin@gmail.com']
+        );
 
-        const existing = await User.findOne({ email: 'admin@gmail.com' });
-        if (existing) {
+        if (existing.length) {
             console.log('✓ El usuario admin ya existe. No se realizaron cambios.');
-            await mongoose.disconnect();
             return;
         }
 
         const hashedPassword = await bcrypt.hash('admin123', 10);
-        await User.create({
-            username: 'admin',
-            email: 'admin@gmail.com',
-            password: hashedPassword,
-            role: 'admin',
-        });
+        await pool.query(
+            `INSERT INTO users (username, email, password, role)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (email) DO NOTHING`,
+            ['admin', 'admin@gmail.com', hashedPassword, 'admin']
+        );
 
         console.log('✓ Usuario administrador creado:');
         console.log('  Email:    admin@gmail.com');
@@ -55,7 +42,7 @@ const seed = async () => {
     } catch (error) {
         console.error('Error en seed:', error.message);
     } finally {
-        await mongoose.disconnect();
+        await closePool();
     }
 };
 

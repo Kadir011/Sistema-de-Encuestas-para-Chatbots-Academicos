@@ -1,94 +1,99 @@
 /**
- * Conexión a MongoDB Atlas con Mongoose
+ * Conexión a PostgreSQL (Neon) con pg
  *
- * Reemplaza el pool de pg. Mongoose gestiona su propio pool de conexiones
- * internamente a través del driver nativo de MongoDB.
+ * Reemplaza la conexión Mongoose/MongoDB Atlas. Se usa un Pool de `pg`
+ * apuntando al connection string "pooler" de Neon (PgBouncer en modo
+ * transaction), por lo que cada query toma y libera una conexión corta.
  *
- * Equivalencias con la versión PostgreSQL:
- *  - pool de conexiones  → opción maxPoolSize en Mongoose
- *  - transaction()       → mongoose.startSession() + session.withTransaction()
- *  - queryParallel()     → Promise.all (sin cambios, igual que antes)
- *  - queryIdempotent()   → unique indexes en los schemas + { upsert } en queries
+ * Equivalencias con la versión MongoDB:
+ *  - mongoose.connect()          → new Pool() + pool.connect()
+ *  - maxPoolSize                 → max
+ *  - session.withTransaction()   → BEGIN / COMMIT / ROLLBACK sobre un client dedicado
+ *  - Promise.all()                → queryParallel() (sin cambios)
  */
 
-import mongoose from 'mongoose';
+import pg from 'pg';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// ─── Conexión ─────────────────────────────────────────────────────────────────
+const { Pool } = pg;
+
+// ─── Pool de conexiones ─────────────────────────────────────────────────────
+export const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    // Neon exige SSL; con el pooler basta con no verificar el certificado local.
+    ssl: { rejectUnauthorized: false },
+    max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 10,
+    connectionTimeoutMillis: process.env.DB_CONN_TIMEOUT
+        ? parseInt(process.env.DB_CONN_TIMEOUT)
+        : 5000,
+    idleTimeoutMillis: process.env.DB_IDLE_TIMEOUT
+        ? parseInt(process.env.DB_IDLE_TIMEOUT)
+        : 30000,
+});
+
+pool.on('error', (err) => {
+    // Errores en clientes ociosos del pool (p.ej. el servidor cierra la conexión).
+    console.error('Error inesperado en el pool de PostgreSQL:', err.message);
+});
+
+// ─── Conexión inicial (equivalente a connectDB() de Mongoose) ────────────────
 export const connectDB = async () => {
     try {
-        const conn = await mongoose.connect(process.env.DATABASE_URL, {
-            dbName: 'chatbots_system',
-            maxPoolSize: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 10,
-            serverSelectionTimeoutMS: process.env.DB_CONN_TIMEOUT
-                ? parseInt(process.env.DB_CONN_TIMEOUT)
-                : 5000,
-            socketTimeoutMS: process.env.DB_IDLE_TIMEOUT
-                ? parseInt(process.env.DB_IDLE_TIMEOUT)
-                : 30000,
-        });
-
-        console.log(`MongoDB Atlas conectado: ${conn.connection.host}`);
-        console.log(`Base de datos: ${conn.connection.name}`);
+        const { rows } = await pool.query('SELECT current_database() AS db, NOW() AS now');
+        console.log(`PostgreSQL (Neon) conectado`);
+        console.log(`Base de datos: ${rows[0].db}`);
         return true;
     } catch (error) {
-        console.error('Error al conectar con MongoDB Atlas:', error.message);
+        console.error('Error al conectar con PostgreSQL:', error.message);
         return false;
     }
 };
 
-// ─── Test de conexión (equivalente al testConnection() de pg) ─────────────────
+// ─── Test de conexión ─────────────────────────────────────────────────────────
 export const testConnection = async () => {
     try {
-        if (mongoose.connection.readyState === 1) {
-            console.log('Conexión activa a MongoDB Atlas');
-            return true;
-        }
-        return await connectDB();
+        await pool.query('SELECT 1');
+        return true;
     } catch (error) {
         console.error('Error al verificar conexión:', error.message);
         return false;
     }
 };
 
-// ─── Transacción con reintentos (equivalente a transaction() de pg) ───────────
+// ─── Query simple con un client del pool (helper interno para los modelos) ───
+export const query = (text, params) => pool.query(text, params);
+
+// ─── Transacción con reintentos ante conflictos de escritura ─────────────────
 /**
- * Ejecuta una función dentro de una sesión transaccional de MongoDB.
- * Reintenta automáticamente ante errores de escritura transitoria (código 112)
- * o fallos de transacción (código 251).
+ * Ejecuta una función dentro de una transacción usando un client dedicado.
+ * Reintenta automáticamente ante errores transitorios de serialización
+ * (40001) o deadlock (40P01), igual que el manejo de WriteConflict de Mongo.
  *
- * @param {Function} callback - async (session) => result
+ * @param {Function} callback - async (client) => result
  * @param {number}   maxRetries
  */
 export const transaction = async (callback, maxRetries = 3) => {
     let attempt = 0;
 
     while (attempt < maxRetries) {
-        const session = await mongoose.startSession();
+        const client = await pool.connect();
         try {
-            let result;
-            await session.withTransaction(async () => {
-                result = await callback(session);
-            });
-            session.endSession();
+            await client.query('BEGIN');
+            const result = await callback(client);
+            await client.query('COMMIT');
             return result;
         } catch (error) {
-            session.endSession();
+            await client.query('ROLLBACK').catch(() => {});
 
-            // Códigos de error transitorio de MongoDB
-            const isRetriable =
-                error.code === 112 ||   // WriteConflict
-                error.code === 251 ||   // NoSuchTransaction
-                error.errorLabels?.includes('TransientTransactionError');
-
+            const isRetriable = error.code === '40001' || error.code === '40P01';
             attempt++;
 
             if (isRetriable && attempt < maxRetries) {
                 const delay = Math.pow(2, attempt) * 100;
                 console.warn(
-                    `WriteConflict detectado, reintentando en ${delay}ms ` +
+                    `Conflicto de escritura detectado, reintentando en ${delay}ms ` +
                     `(intento ${attempt}/${maxRetries})`
                 );
                 await new Promise(resolve => setTimeout(resolve, delay));
@@ -96,21 +101,23 @@ export const transaction = async (callback, maxRetries = 3) => {
             }
 
             throw error;
+        } finally {
+            client.release();
         }
     }
 };
 
-// ─── Queries paralelas (sin cambio, sigue usando Promise.all) ─────────────────
+// ─── Queries paralelas (sin cambio, sigue usando Promise.all) ────────────────
 export const queryParallel = async (queries) => Promise.all(queries);
 
-// ─── Cerrar conexión ──────────────────────────────────────────────────────────
+// ─── Cerrar pool ───────────────────────────────────────────────────────────
 export const closePool = async () => {
     try {
-        await mongoose.disconnect();
-        console.log('Conexión a MongoDB cerrada correctamente');
+        await pool.end();
+        console.log('Pool de PostgreSQL cerrado correctamente');
     } catch (error) {
-        console.error('Error al cerrar la conexión:', error.message);
+        console.error('Error al cerrar el pool:', error.message);
     }
 };
 
-export default mongoose;
+export default pool;
