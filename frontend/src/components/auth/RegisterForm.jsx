@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useParams } from 'react-router-dom';
-import { User, Mail, Lock, Eye, EyeOff, UserCircle } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff, UserCircle, Check, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useForm } from '../../hooks/useForm';
 import { validateRegisterForm } from '../../utils/validators';
@@ -8,6 +8,7 @@ import { ROLES } from '../../utils/constants';
 import Input from '../common/Input';
 import Button from '../common/Button';
 import Alert from '../common/Alert';
+import PasswordStrengthMeter from '../common/PasswordStrengthMeter';
 
 const RegisterForm = () => {
     const { role } = useParams(); // Obtiene el rol de la URL (ej: /register/student)
@@ -123,6 +124,7 @@ const RegisterForm = () => {
                                 touched={touched.password}
                                 placeholder="••••••••"
                                 icon={<Lock size={20} className="text-gray-400" />}
+                                className="mb-1"
                                 required
                             />
                             <button
@@ -132,6 +134,7 @@ const RegisterForm = () => {
                             >
                                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                             </button>
+                            <PasswordStrengthMeter password={values.password} />
                         </div>
 
                         <div className="relative">
@@ -155,6 +158,17 @@ const RegisterForm = () => {
                             >
                                 {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                             </button>
+                            {values.confirmPassword && (
+                                <p className={`mt-1 text-xs flex items-center ${
+                                    values.password === values.confirmPassword ? 'text-green-600' : 'text-red-600'
+                                }`}>
+                                    {values.password === values.confirmPassword ? (
+                                        <><Check size={13} className="mr-1" /> Las contraseñas coinciden</>
+                                    ) : (
+                                        <><X size={13} className="mr-1" /> Las contraseñas no coinciden</>
+                                    )}
+                                </p>
+                            )}
                         </div>
 
                         <Button
