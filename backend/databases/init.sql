@@ -34,6 +34,11 @@ CREATE TABLE IF NOT EXISTS student_surveys (
     will_continue_using       BOOLEAN,
     would_recommend           BOOLEAN,
     additional_comments       TEXT,
+    -- Fecha del día (sin hora), calculada en el servidor al insertar.
+    -- Se guarda en una columna propia (no como expresión indexada) porque
+    -- PostgreSQL no permite indexar CAST(timestamptz AS date): depende de
+    -- la zona horaria de la sesión y no se considera IMMUTABLE.
+    survey_date               DATE NOT NULL DEFAULT CURRENT_DATE,
     created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -43,7 +48,7 @@ CREATE INDEX IF NOT EXISTS idx_student_surveys_created_at  ON student_surveys (c
 -- Una encuesta por usuario por día (equivalente al índice único compuesto
 -- con survey_date usado en la versión Mongo).
 CREATE UNIQUE INDEX IF NOT EXISTS idx_student_survey_user_day
-    ON student_surveys (user_id, (created_at::date));
+    ON student_surveys (user_id, survey_date);
 
 -- ─── teacher_surveys ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS teacher_surveys (
@@ -65,6 +70,7 @@ CREATE TABLE IF NOT EXISTS teacher_surveys (
     countries                 TEXT[] DEFAULT '{}',
     years_experience          VARCHAR(50),
     additional_comments       TEXT,
+    survey_date               DATE NOT NULL DEFAULT CURRENT_DATE,
     created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -72,4 +78,4 @@ CREATE INDEX IF NOT EXISTS idx_teacher_surveys_user_id    ON teacher_surveys (us
 CREATE INDEX IF NOT EXISTS idx_teacher_surveys_created_at ON teacher_surveys (created_at DESC);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_teacher_survey_user_day
-    ON teacher_surveys (user_id, (created_at::date));
+    ON teacher_surveys (user_id, survey_date);

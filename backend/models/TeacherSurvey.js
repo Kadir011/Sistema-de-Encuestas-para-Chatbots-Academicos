@@ -23,6 +23,15 @@ const SELECT_WITH_USER = `
     LEFT JOIN users u ON u.id = t.user_id
 `;
 
+// Columnas devueltas por INSERT/UPDATE (sin survey_date: es un campo interno
+// para el índice de idempotencia, igual que en la versión Mongo original).
+const RETURNING_COLUMNS = `
+    id, user_id, has_used_chatbot, chatbots_used, courses_used, purposes,
+    outcomes, challenges, likelihood_future_use, advantages, concerns,
+    resources_needed, would_recommend, age_range, institution_type,
+    countries, years_experience, additional_comments, created_at
+`;
+
 class TeacherSurvey {
 
     // ── Crear encuesta (idempotente por usuario + día) ───────────────────────
@@ -35,7 +44,7 @@ class TeacherSurvey {
                     resources_needed, would_recommend, age_range, institution_type,
                     countries, years_experience, additional_comments
                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-                 RETURNING *`,
+                 RETURNING ${RETURNING_COLUMNS}`,
                 [
                     surveyData.user_id,
                     surveyData.has_used_chatbot,
@@ -120,7 +129,7 @@ class TeacherSurvey {
 
             values.push(id);
             const { rows } = await pool.query(
-                `UPDATE teacher_surveys SET ${setClauses.join(', ')} WHERE id = $${i} RETURNING *`,
+                `UPDATE teacher_surveys SET ${setClauses.join(', ')} WHERE id = $${i} RETURNING ${RETURNING_COLUMNS}`,
                 values
             );
             return rows[0] || null;
