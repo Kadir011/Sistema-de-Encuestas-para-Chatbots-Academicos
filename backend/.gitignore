@@ -1,6 +1,5 @@
 .env
 .env.local
-.env.example
 .env.development
 node_modules
 .DS_Store
