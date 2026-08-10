@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useForm } from '../hooks/useForm';
 import authService from '../services/authService';
+import { validatePasswordChangeForm } from '../utils/validators';
 import Header from '../components/layout/Header';
 import Card from '../components/common/Card';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
+import PasswordStrengthMeter from '../components/common/PasswordStrengthMeter';
 import { User, Mail, Lock, Shield } from 'lucide-react';
 import { formatRole } from '../utils/formatters';
 
@@ -23,26 +25,27 @@ const Profile = () => {
         handleChange,
         handleBlur,
         handleSubmit,
-    } = useForm({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-    });
+        reset,
+    } = useForm(
+        {
+            currentPassword: '',
+            newPassword: '',
+            confirmPassword: '',
+        },
+        validatePasswordChangeForm
+    );
 
     const onSubmit = async (formData) => {
-        if (formData.newPassword !== formData.confirmPassword) {
-            setError('Las contraseñas no coinciden');
-            return;
-        }
-
         try {
             setLoading(true);
             setError('');
+            setSuccess('');
             await authService.updatePassword({
                 currentPassword: formData.currentPassword,
                 newPassword: formData.newPassword,
             });
             setSuccess('Contraseña actualizada exitosamente');
+            reset();
         } catch (err) {
             setError(err.message || 'Error al actualizar contraseña');
         } finally {
@@ -123,8 +126,10 @@ const Profile = () => {
                                 error={errors.newPassword}
                                 touched={touched.newPassword}
                                 icon={<Lock size={20} className="text-gray-400" />}
+                                className="mb-1"
                                 required
                             />
+                            <PasswordStrengthMeter password={values.newPassword} />
 
                             <Input
                                 label="Confirmar Nueva Contraseña"

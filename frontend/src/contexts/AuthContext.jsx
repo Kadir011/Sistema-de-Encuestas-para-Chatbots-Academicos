@@ -65,10 +65,10 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Actualizar perfil
-    const updateProfile = async (userData) => {
+    // Actualizar perfil (username/email), requiere currentPassword
+    const updateProfile = async (profileData) => {
         try {
-            const response = await authService.getProfile();
+            const response = await authService.updateProfile(profileData);
             setUser(response.user);
             return response;
         } catch (error) {
