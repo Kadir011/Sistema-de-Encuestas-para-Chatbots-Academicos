@@ -2,7 +2,7 @@
 
 echo "======================================"
 echo "  Chatbots Education Survey Setup"
-echo "  MongoDB Atlas Edition"
+echo "  PostgreSQL (Neon) Edition"
 echo "======================================"
 echo ""
 
@@ -33,9 +33,9 @@ if ! command -v npm &> /dev/null; then
 fi
 print_success "npm encontrado: $(npm --version)"
 
-# Ya no se necesita psql — MongoDB Atlas es cloud
+# No se necesita psql local — Neon es Postgres serverless en la nube
 echo ""
-print_info "Base de datos: MongoDB Atlas (cloud). No se requiere instalación local."
+print_info "Base de datos: PostgreSQL en Neon (cloud). No se requiere instalación local."
 echo ""
 
 # ──────────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ fi
 
 npm install
 if [ $? -eq 0 ]; then
-    print_success "Dependencias del backend instaladas (incluye mongoose)"
+    print_success "Dependencias del backend instaladas (incluye pg)"
 else
     print_error "Error al instalar dependencias del backend"
     exit 1
@@ -61,15 +61,15 @@ fi
 if [ ! -f ".env" ]; then
     print_info "Creando archivo .env del backend..."
 
-    read -p "Ingresa tu MongoDB Atlas connection string: " MONGO_URL
-    MONGO_URL=${MONGO_URL:-"mongodb+srv://user:password@cluster.mongodb.net/?appName=MyCluster"}
+    read -p "Ingresa tu connection string de Neon (con pooler): " NEON_URL
+    NEON_URL=${NEON_URL:-"postgresql://user:password@ep-example-pooler.region.aws.neon.tech/dbname?sslmode=require&channel_binding=require"}
 
     read -p "Ingresa tu JWT_SECRET (o presiona Enter para usar uno por defecto): " JWT_SECRET_INPUT
     JWT_SECRET_INPUT=${JWT_SECRET_INPUT:-"cambiar_este_secreto_en_produccion_$(openssl rand -hex 16 2>/dev/null || echo '12345')"}
 
     cat > .env <<EOF
-# ─── MongoDB Atlas ────────────────────────────────────────────
-DATABASE_URL=${MONGO_URL}
+# ─── PostgreSQL (Neon) ────────────────────────────────────────
+DATABASE_URL=${NEON_URL}
 DB_POOL_MAX=10
 DB_IDLE_TIMEOUT=30000
 DB_CONN_TIMEOUT=5000
@@ -124,14 +124,31 @@ fi
 cd ..
 
 # ──────────────────────────────────────────────────────────────
-# SEED — Usuario administrador en MongoDB Atlas
+# MIGRATE — Crear tablas en PostgreSQL (Neon)
 # ──────────────────────────────────────────────────────────────
 echo ""
-echo "🌱 Creando usuario administrador en MongoDB Atlas..."
+echo "🗄️  Aplicando esquema (users, student_surveys, teacher_surveys)..."
 print_info "Esto requiere que DATABASE_URL en backend/.env sea válida."
 
 cd backend
-node database/seed.js
+node databases/migrate.js
+MIGRATE_EXIT=$?
+cd ..
+
+if [ $MIGRATE_EXIT -eq 0 ]; then
+    print_success "Esquema aplicado correctamente"
+else
+    print_warn "La migración falló. Verifica tu DATABASE_URL."
+fi
+
+# ──────────────────────────────────────────────────────────────
+# SEED — Usuario administrador en PostgreSQL
+# ──────────────────────────────────────────────────────────────
+echo ""
+echo "🌱 Creando usuario administrador..."
+
+cd backend
+node databases/seed.js
 SEED_EXIT=$?
 cd ..
 
