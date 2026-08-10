@@ -1,10 +1,9 @@
 /**
  * Servidor Principal
  *
- * Cambio respecto a la versión PostgreSQL:
- *  - testConnection() → connectDB() de Mongoose (cierra la conexión en shutdown)
- *  - closePool()      → mongoose.disconnect() (envuelto en closePool() de database.js)
- *  - El resto de la lógica HTTP y los patrones SOLID/Observer no cambian.
+ * Conexión a PostgreSQL (Neon) vía pool de `pg`. connectDB()/testConnection()/
+ * closePool() vienen de config/database.js. El resto de la lógica HTTP y los
+ * patrones SOLID/Observer no cambian respecto a la versión MongoDB.
  */
 
 import express from 'express';
@@ -47,7 +46,7 @@ app.get('/', (req, res) => {
         message: 'API de Chatbots Education Survey',
         version: '3.0.0',
         status: 'running',
-        database: 'MongoDB Atlas',
+        database: 'PostgreSQL (Neon)',
         architecture: 'SOLID + Repository + Strategy + Observer + Factory',
     });
 });
@@ -58,7 +57,7 @@ app.get('/api/health', async (req, res) => {
         res.json({
             success: true,
             status: 'OK',
-            database: dbConnected ? 'conectada (MongoDB Atlas)' : 'desconectada',
+            database: dbConnected ? 'conectada (PostgreSQL / Neon)' : 'desconectada',
             environment: process.env.NODE_ENV || 'development',
             timestamp: new Date().toISOString(),
             uptime: process.uptime(),
@@ -110,7 +109,7 @@ const startServer = async () => {
         // Observer: registrar listeners ANTES de abrir el puerto
         registerAllListeners();
 
-        // Conectar a MongoDB Atlas
+        // Conectar a PostgreSQL (Neon)
         const dbConnected = await connectDB();
         if (!dbConnected) {
             console.warn('Advertencia: Servidor iniciado sin conexión a BD');
@@ -122,7 +121,7 @@ const startServer = async () => {
             console.log('='.repeat(60));
             console.log(`   Puerto:        ${PORT}`);
             console.log(`   URL:           http://localhost:${PORT}`);
-            console.log(`   Base de datos: ${dbConnected ? 'MongoDB Atlas conectada' : 'Desconectada'}`);
+            console.log(`   Base de datos: ${dbConnected ? 'PostgreSQL (Neon) conectada' : 'Desconectada'}`);
             console.log(`   Modo:          ${process.env.NODE_ENV || 'development'}`);
             console.log(`   Arquitectura:  SOLID + Repository + Strategy + Observer + Factory`);
             console.log('='.repeat(60) + '\n');

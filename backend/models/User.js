@@ -1,103 +1,48 @@
 /**
- * Modelo de Usuario — Mongoose Schema
+ * Modelo de Usuario — PostgreSQL (pg)
  *
- * Equivalencias con la versión PostgreSQL:
- *  - UNIQUE email / username  → unique: true en el schema
- *  - ON CONFLICT DO NOTHING   → save() captura el error 11000 (duplicate key)
- *  - ON CONFLICT DO UPDATE    → findOneAndUpdate({ upsert: true })
- *  - bcrypt                   → pre-save hook (igual que antes)
- *  - transaction()            → recibe session opcional
+ * Equivalencias con la versión MongoDB:
+ *  - unique: true (schema)     → UNIQUE en la tabla + captura del código 23505
+ *  - error 11000 (duplicate)   → error.code === '23505' (unique_violation)
+ *  - findOneAndUpdate(upsert)  → INSERT ... ON CONFLICT DO UPDATE
+ *  - pre('save') hash          → hash explícito antes del INSERT/UPDATE
+ *  - toSafeObject()            → _toSafe() (misma forma de salida)
  *
- * SOLID: SRP — solo define la estructura y el acceso a datos del usuario.
+ * SOLID: SRP — solo define el acceso a datos del usuario. La misma API
+ * estática (create, findByEmail, findById, ...) se mantiene para que
+ * UserRepository y los controladores no necesiten ningún cambio.
  */
 
-import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
+import { pool } from '../config/database.js';
 
 const SALT_ROUNDS = 10;
 
-// ─── Schema ───────────────────────────────────────────────────────────────────
-const userSchema = new mongoose.Schema(
-    {
-        username: {
-            type: String,
-            required: [true, 'El nombre de usuario es requerido'],
-            unique: true,
-            trim: true,
-            minlength: 3,
-            maxlength: 50,
-        },
-        email: {
-            type: String,
-            required: [true, 'El correo electrónico es requerido'],
-            unique: true,
-            trim: true,
-            lowercase: true,
-            match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Formato de email inválido'],
-        },
-        password: {
-            type: String,
-            required: [true, 'La contraseña es requerida'],
-            minlength: 6,
-        },
-        role: {
-            type: String,
-            enum: ['student', 'teacher', 'admin'],
-            default: 'student',
-        },
-    },
-    {
-        timestamps: { createdAt: 'created_at', updatedAt: false },
-        versionKey: false,
-    }
-);
-
-// ─── Índices (equivalente a CREATE INDEX en PostgreSQL) ───────────────────────
-userSchema.index({ email: 1 });
-userSchema.index({ role: 1 });
-
-// ─── Pre-save hook: hash de contraseña ────────────────────────────────────────
-userSchema.pre('save', async function (next) {
-    if (!this.isModified('password')) return next();
-    this.password = await bcrypt.hash(this.password, SALT_ROUNDS);
-    next();
-});
-
-// ─── Helper: serialización segura (sin password) ─────────────────────────────
-userSchema.methods.toSafeObject = function () {
-    return {
-        id: this._id.toString(),
-        username: this.username,
-        email: this.email,
-        role: this.role,
-        created_at: this.created_at,
-    };
-};
-
-const UserModel = mongoose.model('User', userSchema, 'users');
-
-// ─── Clase estática User (misma API que la versión pg) ────────────────────────
 class User {
 
-    // ── create (idempotente por email) ────────────────────────────────────────
+    // ── create ─────────────────────────────────────────────────────────────
     static async create({ username, email, password, role = 'student' }) {
+        const hashed = await bcrypt.hash(password, SALT_ROUNDS);
         try {
-            const user = new UserModel({ username, email, password, role });
-            await user.save();
-            return user.toSafeObject();
+            const { rows } = await pool.query(
+                `INSERT INTO users (username, email, password, role)
+                 VALUES ($1, $2, $3, $4)
+                 RETURNING id, username, email, role, created_at`,
+                [username, email, hashed, role]
+            );
+            return rows[0];
         } catch (error) {
-            if (error.code === 11000) {
-                const field = Object.keys(error.keyPattern)[0];
-                if (field === 'email') throw new Error('El email ya está registrado');
-                if (field === 'username') throw new Error('El nombre de usuario ya está en uso');
+            if (error.code === '23505') {
+                if (error.constraint?.includes('email')) throw new Error('El email ya está registrado');
+                if (error.constraint?.includes('username')) throw new Error('El nombre de usuario ya está en uso');
             }
             throw error;
         }
     }
 
-    // ── findOrCreate ──────────────────────────────────────────────────────────
+    // ── findOrCreate ──────────────────────────────────────────────────────
     static async findOrCreate({ username, email, password, role = 'student' }) {
-        const existing = await UserModel.findOne({ email }).lean();
+        const existing = await User.findByEmail(email);
         if (existing) {
             return { user: _toSafe(existing), created: false };
         }
@@ -105,70 +50,87 @@ class User {
         return { user, created: true };
     }
 
-    // ── Búsquedas ──────────────────────────────────────────────────────────────
+    // ── Búsquedas ─────────────────────────────────────────────────────────
     static async findByEmail(email) {
         // Incluimos password para la verificación de login
-        return UserModel.findOne({ email }).lean();
+        const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        return rows[0] || null;
     }
 
     static async findById(id) {
         try {
-            const user = await UserModel.findById(id).lean();
-            return user ? _toSafe(user) : null;
+            const { rows } = await pool.query(
+                'SELECT id, username, email, role, created_at FROM users WHERE id = $1',
+                [id]
+            );
+            return rows[0] || null;
         } catch {
             return null; // id inválido
         }
     }
 
     static async findByUsername(username) {
-        return UserModel.findOne({ username }).lean();
+        const { rows } = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+        return rows[0] || null;
     }
 
     static async findAll() {
-        const users = await UserModel.find().sort({ created_at: -1 }).lean();
-        return users.map(_toSafe);
+        const { rows } = await pool.query(
+            'SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC'
+        );
+        return rows;
     }
 
     static async findByRole(role) {
-        const users = await UserModel.find({ role }).sort({ created_at: -1 }).lean();
-        return users.map(_toSafe);
+        const { rows } = await pool.query(
+            'SELECT id, username, email, role, created_at FROM users WHERE role = $1 ORDER BY created_at DESC',
+            [role]
+        );
+        return rows;
     }
 
-    // ── Verificar contraseña ──────────────────────────────────────────────────
+    // ── Verificar contraseña ─────────────────────────────────────────────
     static async verifyPassword(plainPassword, hashedPassword) {
         return bcrypt.compare(plainPassword, hashedPassword);
     }
 
-    // ── Actualizar usuario ────────────────────────────────────────────────────
+    // ── Actualizar usuario ────────────────────────────────────────────────
     static async update(id, { username, email, role }) {
         try {
             // Verificar colisiones de email/username con otros usuarios
             if (email) {
-                const conflict = await UserModel.findOne({ email, _id: { $ne: id } });
-                if (conflict) throw new Error('El email ya está en uso');
+                const { rows } = await pool.query(
+                    'SELECT id FROM users WHERE email = $1 AND id != $2', [email, id]
+                );
+                if (rows.length) throw new Error('El email ya está en uso');
             }
             if (username) {
-                const conflict = await UserModel.findOne({ username, _id: { $ne: id } });
-                if (conflict) throw new Error('El nombre de usuario ya está en uso');
+                const { rows } = await pool.query(
+                    'SELECT id FROM users WHERE username = $1 AND id != $2', [username, id]
+                );
+                if (rows.length) throw new Error('El nombre de usuario ya está en uso');
             }
 
-            const updates = {};
-            if (username !== undefined) updates.username = username;
-            if (email !== undefined) updates.email = email;
-            if (role !== undefined) updates.role = role;
+            const fields = [];
+            const values = [];
+            let i = 1;
+            if (username !== undefined) { fields.push(`username = $${i++}`); values.push(username); }
+            if (email !== undefined) { fields.push(`email = $${i++}`); values.push(email); }
+            if (role !== undefined) { fields.push(`role = $${i++}`); values.push(role); }
 
-            const user = await UserModel.findByIdAndUpdate(
-                id,
-                { $set: updates },
-                { new: true, runValidators: true }
-            ).lean();
+            if (!fields.length) return User.findById(id);
 
-            return user ? _toSafe(user) : null;
+            values.push(id);
+            const { rows } = await pool.query(
+                `UPDATE users SET ${fields.join(', ')} WHERE id = $${i}
+                 RETURNING id, username, email, role, created_at`,
+                values
+            );
+            return rows[0] || null;
         } catch (error) {
-            if (error.code === 11000) {
-                const field = Object.keys(error.keyPattern)[0];
+            if (error.code === '23505') {
                 throw new Error(
-                    field === 'email'
+                    error.constraint?.includes('email')
                         ? 'El email ya está en uso'
                         : 'El nombre de usuario ya está en uso'
                 );
@@ -177,73 +139,54 @@ class User {
         }
     }
 
-    // ── Actualizar contraseña ─────────────────────────────────────────────────
+    // ── Actualizar contraseña ───────────────────────────────────────────────
     static async updatePassword(id, newPassword) {
         const hashed = await bcrypt.hash(newPassword, SALT_ROUNDS);
-        const user = await UserModel.findByIdAndUpdate(
-            id,
-            { $set: { password: hashed } },
-            { new: true }
-        ).lean();
-        return user ? { id: user._id.toString() } : null;
+        const { rows } = await pool.query(
+            'UPDATE users SET password = $1 WHERE id = $2 RETURNING id',
+            [hashed, id]
+        );
+        return rows[0] || null;
     }
 
-    // ── Eliminar ──────────────────────────────────────────────────────────────
+    // ── Eliminar ─────────────────────────────────────────────────────────
     static async delete(id) {
         try {
-            const result = await UserModel.findByIdAndDelete(id).lean();
-            return result ? { id: result._id.toString() } : null;
+            const { rows } = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
+            return rows[0] || null;
         } catch {
             return null;
         }
     }
 
-    // ── Estadísticas ──────────────────────────────────────────────────────────
+    // ── Estadísticas ─────────────────────────────────────────────────────
     static async getStatistics() {
-        const now = new Date();
-        const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
-        const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
-
-        const [total, admins, teachers, students, newThisWeek, newThisMonth] =
-            await Promise.all([
-                UserModel.countDocuments(),
-                UserModel.countDocuments({ role: 'admin' }),
-                UserModel.countDocuments({ role: 'teacher' }),
-                UserModel.countDocuments({ role: 'student' }),
-                UserModel.countDocuments({ created_at: { $gte: sevenDaysAgo } }),
-                UserModel.countDocuments({ created_at: { $gte: thirtyDaysAgo } }),
-            ]);
-
-        return {
-            total_users: total,
-            admins,
-            teachers,
-            students,
-            new_this_week: newThisWeek,
-            new_this_month: newThisMonth,
-        };
+        const { rows } = await pool.query(`
+            SELECT
+                COUNT(*)::int                                                            AS total_users,
+                COUNT(*) FILTER (WHERE role = 'admin')::int                               AS admins,
+                COUNT(*) FILTER (WHERE role = 'teacher')::int                             AS teachers,
+                COUNT(*) FILTER (WHERE role = 'student')::int                             AS students,
+                COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int      AS new_this_week,
+                COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int     AS new_this_month
+            FROM users
+        `);
+        return rows[0];
     }
 
     static async countByRole() {
-        const result = await UserModel.aggregate([
-            { $group: { _id: '$role', count: { $sum: 1 } } },
-        ]);
-        return result.map(r => ({ role: r._id, count: r.count }));
+        const { rows } = await pool.query(
+            'SELECT role, COUNT(*)::int AS count FROM users GROUP BY role'
+        );
+        return rows;
     }
 }
 
-// ─── Helper interno ───────────────────────────────────────────────────────────
-function _toSafe(doc) {
-    return {
-        id: doc._id.toString(),
-        username: doc.username,
-        email: doc.email,
-        role: doc.role,
-        created_at: doc.created_at,
-        // Incluimos password solo si está presente (para login)
-        ...(doc.password ? { password: doc.password } : {}),
-    };
+// ─── Helper interno: serialización segura (sin password) ────────────────────
+function _toSafe(user) {
+    if (!user) return null;
+    const { password, ...safe } = user;
+    return safe;
 }
 
-export { UserModel };
 export default User;
