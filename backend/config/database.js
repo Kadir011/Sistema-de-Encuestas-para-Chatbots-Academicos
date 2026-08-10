@@ -14,16 +14,19 @@
 
 import pg from 'pg';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 
 const { Pool } = pg;
 
 // ─── Pool de conexiones ─────────────────────────────────────────────────────
+// El connection string ya transporta el módelo de SSL si la URL lo especifica.
+// No forzamos `ssl` en el Pool porque la librería pg interpreta `sslmode` del
+// DSN y, en algunos Neon/PgBouncer endpoints, esa doble configuración pude
+// provocar el error `The server does not support SSL connections`.
 export const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    // Neon exige SSL; con el pooler basta con no verificar el certificado local.
-    ssl: { rejectUnauthorized: false },
     max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 10,
     connectionTimeoutMillis: process.env.DB_CONN_TIMEOUT
         ? parseInt(process.env.DB_CONN_TIMEOUT)
@@ -41,7 +44,12 @@ pool.on('error', (err) => {
 // ─── Conexión inicial (equivalente a connectDB() de Mongoose) ────────────────
 export const connectDB = async () => {
     try {
-        const { rows } = await pool.query('SELECT current_database() AS db, NOW() AS now');
+        const queryPromise = pool.query('SELECT current_database() AS db, NOW() AS now');
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Timeout de PostgreSQL en connectDB')), 2500);
+        });
+
+        const { rows } = await Promise.race([queryPromise, timeoutPromise]);
         console.log(`PostgreSQL (Neon) conectado`);
         console.log(`Base de datos: ${rows[0].db}`);
         return true;
@@ -54,7 +62,12 @@ export const connectDB = async () => {
 // ─── Test de conexión ─────────────────────────────────────────────────────────
 export const testConnection = async () => {
     try {
-        await pool.query('SELECT 1');
+        const queryPromise = pool.query('SELECT 1');
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Timeout de PostgreSQL en testConnection')), 2500);
+        });
+
+        await Promise.race([queryPromise, timeoutPromise]);
         return true;
     } catch (error) {
         console.error('Error al verificar conexión:', error.message);

@@ -9,6 +9,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
 import { connectDB, testConnection, closePool } from './config/database.js';
 import { registerAllListeners, MetricsListener } from './listeners/domainEventListeners.js';
 
@@ -19,7 +20,7 @@ import studentSurveyRoutes from './routes/studentSurveyRoutes.js';
 import teacherSurveyRoutes from './routes/teacherSurveyRoutes.js';
 import exportRoutes from './routes/exportRoutes.js';
 
-dotenv.config();
+dotenv.config({ path: fileURLToPath(new URL('./.env', import.meta.url)) });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -109,23 +110,32 @@ const startServer = async () => {
         // Observer: registrar listeners ANTES de abrir el puerto
         registerAllListeners();
 
-        // Conectar a PostgreSQL (Neon)
-        const dbConnected = await connectDB();
-        if (!dbConnected) {
-            console.warn('Advertencia: Servidor iniciado sin conexión a BD');
-        }
-
         const server = app.listen(PORT, '0.0.0.0', () => {
             console.log('\n' + '='.repeat(60));
             console.log('   SERVIDOR CORRIENDO');
             console.log('='.repeat(60));
             console.log(`   Puerto:        ${PORT}`);
             console.log(`   URL:           http://localhost:${PORT}`);
-            console.log(`   Base de datos: ${dbConnected ? 'PostgreSQL (Neon) conectada' : 'Desconectada'}`);
+            console.log(`   Base de datos: comprobación asíncrona en segundo plano`);
             console.log(`   Modo:          ${process.env.NODE_ENV || 'development'}`);
             console.log(`   Arquitectura:  SOLID + Repository + Strategy + Observer + Factory`);
             console.log('='.repeat(60) + '\n');
         });
+
+        // Conectar a PostgreSQL (Neon) sin bloquear la apertura del socket HTTP.
+        // Si la conexión externa está caída, el proceso seguirá escuchando y
+        // la API de salud podrá responder con estado desconectado.
+        connectDB()
+            .then((dbConnected) => {
+                if (dbConnected) {
+                    console.log('PostgreSQL (Neon) conectada al iniciar el servidor');
+                } else {
+                    console.warn('Advertencia: Servidor iniciado sin conexión a BD');
+                }
+            })
+            .catch((error) => {
+                console.error('Error al conectar con PostgreSQL en arranque:', error.message);
+            });
 
         const gracefulShutdown = async (signal) => {
             console.log(`\nSeñal ${signal} recibida. Cerrando servidor...`);
