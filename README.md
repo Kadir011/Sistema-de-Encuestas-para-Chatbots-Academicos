@@ -2,6 +2,12 @@
 
 ### Plataforma full‑stack para recopilar y analizar datos sobre el uso de chatbots de IA en contextos educativos
 
+## El problema
+
+Las instituciones educativas quieren saber si estudiantes y profesores realmente usan chatbots de IA, para qué, y si eso mejora o no los resultados académicos — pero normalmente esa información vive dispersa en encuestas de Google Forms sin estructura ni forma de cruzar variables entre facultades, roles o el tiempo.
+
+**ChatBot Survey Platform** centraliza esa recolección con formularios diferenciados por rol (estudiante / profesor), guarda las respuestas en un esquema relacional que permite comparar y filtrar, y expone estadísticas y exportación a Excel para que un equipo de investigación educativa pueda analizar la adopción de IA sin procesar datos a mano.
+
 [![React](https://img.shields.io/badge/React-19.2.0-61dafb?style=for-the-badge&logo=react&logoColor=white&labelColor=0d1117)](https://react.dev/)
 [![Node.js](https://img.shields.io/badge/Node.js-22.x-6cc24a?style=for-the-badge&logo=node.js&logoColor=white&labelColor=0d1117)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express-5.2.1-ffffff?style=for-the-badge&logo=express&logoColor=white&labelColor=0d1117)](https://expressjs.com/)
