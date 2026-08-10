@@ -61,6 +61,19 @@ const authService = {
         }
     },
 
+    // Actualizar datos de cuenta (username/email) — requiere currentPassword
+    updateProfile: async ({ currentPassword, username, email }) => {
+        try {
+            const response = await api.put('/auth/profile', { currentPassword, username, email });
+            if (response.data.user) {
+                localStorage.setItem('user', JSON.stringify(response.data.user));
+            }
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || error;
+        }
+    },
+
     // Verificar si está autenticado
     isAuthenticated: () => {
         return !!localStorage.getItem('token');
