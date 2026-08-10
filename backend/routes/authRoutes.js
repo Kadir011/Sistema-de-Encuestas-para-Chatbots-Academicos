@@ -7,9 +7,9 @@
  */
 
 import express from 'express';
-import { register, login, getProfile, updatePassword, logout } from '../controllers/authController.js';
+import { register, login, getProfile, updatePassword, updateProfile, logout } from '../controllers/authController.js';
 import { verifyToken } from '../middlewares/authMiddleware.js';
-import { validateRegister, validateLogin, sanitizeInput } from '../middlewares/validationMiddleware.js';
+import { validateRegister, validateLogin, validatePasswordChange, validateProfileUpdate, sanitizeInput } from '../middlewares/validationMiddleware.js';
 import { idempotencyMiddleware } from '../middlewares/idempotencyMiddleware.js';
 
 const router = express.Router();
@@ -26,7 +26,8 @@ router.post('/login', sanitizeInput, validateLogin, login);
 
 // Rutas protegidas
 router.get('/profile', verifyToken, getProfile);
-router.put('/password', verifyToken, sanitizeInput, updatePassword);
+router.put('/profile', verifyToken, sanitizeInput, validateProfileUpdate, updateProfile);
+router.put('/password', verifyToken, sanitizeInput, validatePasswordChange, updatePassword);
 router.post('/logout', verifyToken, logout);
 
 export default router;

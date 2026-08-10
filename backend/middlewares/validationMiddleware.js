@@ -28,6 +28,8 @@ const makeValidator = (validatorFn) => (req, res, next) => {
 export const validateRegister = makeValidator(() => ValidatorFactory.createRegisterValidator());
 export const validateLogin = makeValidator(() => ValidatorFactory.createLoginValidator());
 export const validateUserUpdate = makeValidator(() => ValidatorFactory.createUserUpdateValidator());
+export const validateProfileUpdate = makeValidator(() => ValidatorFactory.createProfileUpdateValidator());
+export const validatePasswordChange = makeValidator(() => ValidatorFactory.createPasswordChangeValidator());
 export const validateStudentSurvey = makeValidator(() => ValidatorFactory.createStudentSurveyValidator());
 export const validateTeacherSurvey = makeValidator(() => ValidatorFactory.createTeacherSurveyValidator());
 
@@ -52,4 +54,4 @@ export const sanitizeInput = (req, res, next) => {
     }
 };
 
-export default { validateRegister, validateLogin, validateUserUpdate, validateStudentSurvey, validateTeacherSurvey, sanitizeInput };
+export default { validateRegister, validateLogin, validateUserUpdate, validateProfileUpdate, validatePasswordChange, validateStudentSurvey, validateTeacherSurvey, sanitizeInput };

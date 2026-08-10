@@ -1,7 +1,8 @@
 /**
  * Middleware de Autenticación
- * Adaptado a MongoDB: los IDs son ObjectId strings, no enteros.
- * La lógica de negocio y la API HTTP no cambian.
+ * PostgreSQL: los IDs son enteros (SERIAL). Los params/body de Express
+ * siempre llegan como string, por eso las comparaciones de "ownership"
+ * normalizan ambos lados con String() antes de comparar.
  */
 
 import jwt from 'jsonwebtoken';
@@ -22,7 +23,6 @@ export const verifyToken = async (req, res, next) => {
         const token = authHeader.substring(7);
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        // En MongoDB el id es un string de ObjectId
         const user = await User.findById(decoded.id);
 
         if (!user) {
@@ -33,7 +33,7 @@ export const verifyToken = async (req, res, next) => {
         }
 
         req.user = {
-            id: user.id,           // string ObjectId
+            id: user.id,
             username: user.username,
             email: user.email,
             role: user.role,
@@ -110,7 +110,9 @@ export const verifyOwnership = (paramName = 'userId') => {
 
         const resourceUserId = req.params[paramName] || req.body.user_id;
 
-        if (req.user.id !== resourceUserId) {
+        // req.user.id es numérico (SERIAL de Postgres); los params de ruta y
+        // body siempre llegan como string, así que se comparan como string.
+        if (String(req.user.id) !== String(resourceUserId)) {
             return res.status(403).json({
                 success: false,
                 message: 'No tienes permiso para acceder a este recurso',
@@ -132,8 +134,7 @@ export const verifySurveyOwnership = (Model) => {
             }
             if (req.user.role === 'admin') return next();
 
-            // Comparación string vs string (ambos son ObjectId serializado)
-            if (survey.user_id?.toString() !== req.user.id) {
+            if (String(survey.user_id) !== String(req.user.id)) {
                 return res.status(403).json({
                     success: false,
                     message: 'No tienes permiso para acceder a esta encuesta',

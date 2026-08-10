@@ -32,7 +32,8 @@ class RequiredFieldRule extends ValidationRule {
     validate(data) {
         const value = data[this.field];
         if (value === undefined || value === null || value === '') {
-            return `${this.label} es requerido`;
+            const feminine = /^la\b/i.test(this.label.trim());
+            return `${this.label} es ${feminine ? 'requerida' : 'requerido'}`;
         }
         return null;
     }
@@ -95,6 +96,23 @@ class UsernameFormatRule extends ValidationRule {
         const value = data[this.field];
         if (value && !this.regex.test(value)) {
             return 'El nombre de usuario solo puede contener letras, números y guiones bajos';
+        }
+        return null;
+    }
+}
+
+// Exige mínimo 8 caracteres con mayúscula, minúscula, número y carácter especial.
+// El mismo criterio se muestra en vivo en el frontend (barra de fuerza de contraseña).
+class StrongPasswordRule extends ValidationRule {
+    constructor(field = 'password') {
+        super();
+        this.field = field;
+        this.regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    }
+    validate(data) {
+        const value = data[this.field];
+        if (value && !this.regex.test(value)) {
+            return 'La contraseña debe tener al menos 8 caracteres, con mayúscula, minúscula, número y carácter especial';
         }
         return null;
     }
@@ -214,7 +232,8 @@ class ValidatorFactory {
             new RequiredFieldRule('email', 'El correo electrónico'),
             new EmailFormatRule('email'),
             new RequiredFieldRule('password', 'La contraseña'),
-            new MinLengthRule('password', 'La contraseña', 6),
+            new MinLengthRule('password', 'La contraseña', 8),
+            new StrongPasswordRule('password'),
             new EnumRule('role', 'El rol', ['student', 'teacher', 'admin']),
         ]);
     }
@@ -244,6 +263,38 @@ class ValidatorFactory {
             new UsernameFormatRule('username'),
             new EmailFormatRule('email'),
             new EnumRule('role', 'El rol', ['student', 'teacher', 'admin']),
+        ]);
+    }
+
+    // Autoservicio: el propio usuario edita su username/email desde
+    // Configuración. Exige la contraseña actual como confirmación de
+    // identidad, sin importar su rol (student, teacher o admin).
+    static createProfileUpdateValidator() {
+        return new Validator([
+            new RequiredFieldRule('currentPassword', 'La contraseña actual'),
+            {
+                validate(data) {
+                    if (!data.username && !data.email) {
+                        return 'Debe proporcionar al menos un campo para actualizar (usuario o email)';
+                    }
+                    return null;
+                }
+            },
+            new MinLengthRule('username', 'El nombre de usuario', 3),
+            new MaxLengthRule('username', 'El nombre de usuario', 50),
+            new UsernameFormatRule('username'),
+            new EmailFormatRule('email'),
+        ]);
+    }
+
+    // Autoservicio: cambio de contraseña propio (requiere la actual + la
+    // nueva ya validada con la misma regla de fuerza que el registro).
+    static createPasswordChangeValidator() {
+        return new Validator([
+            new RequiredFieldRule('currentPassword', 'La contraseña actual'),
+            new RequiredFieldRule('newPassword', 'La nueva contraseña'),
+            new MinLengthRule('newPassword', 'La nueva contraseña', 8),
+            new StrongPasswordRule('newPassword'),
         ]);
     }
 

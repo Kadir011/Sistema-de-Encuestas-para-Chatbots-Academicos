@@ -7,7 +7,7 @@ import {
     deleteUser,
     getUserStatistics
 } from '../controllers/userController.js';
-import { verifyToken, verifyAdmin } from '../middlewares/authMiddleware.js';
+import { verifyToken, verifyAdmin, verifyOwnership } from '../middlewares/authMiddleware.js';
 import { 
     validateRegister, 
     validateUserUpdate, 
@@ -33,6 +33,6 @@ router.delete('/:id', verifyAdmin, deleteUser);
 // RUTAS PARA USUARIOS AUTENTICADOS
 // =====================================
 router.get('/:id', getUserById);
-router.put('/:id', sanitizeInput, validateUserUpdate, updateUser);
+router.put('/:id', verifyOwnership('id'), sanitizeInput, validateUserUpdate, updateUser);
 
 export default router;

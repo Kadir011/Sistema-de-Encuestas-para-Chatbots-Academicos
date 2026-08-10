@@ -77,10 +77,35 @@ export const updatePassword = async (req, res) => {
     }
 };
 
+// ─── Actualizar datos propios (username/email) ───────────────────────────────
+// Autoservicio disponible para cualquier rol: requiere la contraseña actual
+// como confirmación de identidad. No permite tocar el rol del usuario.
+export const updateProfile = async (req, res) => {
+    try {
+        const { currentPassword, username, email } = req.body;
+        if (!currentPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'Se requiere la contraseña actual para confirmar los cambios'
+            });
+        }
+        const user = await authService.updateProfile(
+            req.user.id,
+            req.user.email,
+            currentPassword,
+            { username, email }
+        );
+        res.json({ success: true, message: 'Datos actualizados exitosamente', user });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({ success: false, message: error.message });
+    }
+};
+
 // ─── Logout ───────────────────────────────────────────────────────────────────
 export const logout = async (req, res) => {
     await authService.logout(req.user.id);
     res.json({ success: true, message: 'Sesión cerrada exitosamente' });
 };
 
-export default { register, login, getProfile, updatePassword, logout };
+export default { register, login, getProfile, updatePassword, updateProfile, logout };

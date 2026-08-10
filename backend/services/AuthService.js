@@ -106,6 +106,11 @@ class AuthService {
     // Cambio de contraseña 
     async updatePassword(userId, userEmail, currentPassword, newPassword) {
         const user = await this.userRepo.findByEmail(userEmail);
+        if (!user) {
+            const err = new Error('Usuario no encontrado');
+            err.statusCode = 404;
+            throw err;
+        }
         const isValid = await this.userRepo.verifyPassword(currentPassword, user.password);
 
         if (!isValid) {
@@ -116,6 +121,32 @@ class AuthService {
 
         await this.userRepo.updatePassword(userId, newPassword);
         eventBus.publish(DOMAIN_EVENTS.USER_PASSWORD_CHANGED, { userId });
+    }
+
+    // Actualizar datos propios (username/email) 
+    // Cualquier usuario, sin importar su rol, puede editar sus propios datos
+    // siempre que confirme su contraseña actual. No permite cambiar el rol
+    // (eso sigue siendo exclusivo de administradores vía /api/users/:id).
+    async updateProfile(userId, userEmail, currentPassword, { username, email }) {
+        const user = await this.userRepo.findByEmail(userEmail);
+        if (!user) {
+            const err = new Error('Usuario no encontrado');
+            err.statusCode = 404;
+            throw err;
+        }
+
+        const isValid = await this.userRepo.verifyPassword(currentPassword, user.password);
+        if (!isValid) {
+            const err = new Error('La contraseña actual es incorrecta');
+            err.statusCode = 401;
+            throw err;
+        }
+
+        // El propio User.update ya valida colisiones de email/username únicos
+        const updatedUser = await this.userRepo.update(userId, { username, email });
+        eventBus.publish(DOMAIN_EVENTS.USER_UPDATED, { userId });
+
+        return this._sanitize(updatedUser);
     }
 
     // Helpers privados 
