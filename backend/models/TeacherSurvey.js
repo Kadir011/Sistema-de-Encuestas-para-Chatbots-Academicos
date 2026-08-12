@@ -159,6 +159,7 @@ class TeacherSurvey {
                 COUNT(*) FILTER (WHERE likelihood_future_use = 'Muy probable')::int                        AS very_likely_continue,
                 COUNT(*) FILTER (WHERE likelihood_future_use = 'Probable')::int                            AS likely_continue,
                 COUNT(*) FILTER (WHERE likelihood_future_use = 'Imposible')::int                           AS unlikely_continue,
+                COUNT(*) FILTER (WHERE would_recommend)::int                                               AS would_recommend_count,
                 COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int                       AS new_this_week,
                 COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int                      AS new_this_month
             FROM teacher_surveys
@@ -166,7 +167,7 @@ class TeacherSurvey {
         return rows[0] ?? {
             total_surveys: 0, teachers_using_chatbots: 0,
             very_likely_continue: 0, likely_continue: 0, unlikely_continue: 0,
-            new_this_week: 0, new_this_month: 0,
+            would_recommend_count: 0, new_this_week: 0, new_this_month: 0,
         };
     }
 

@@ -98,7 +98,18 @@ const createSurveyController = (type) => {
         }
     };
 
-    return { create, getAll, getById, getMySurveys, update, remove, getStatistics, getMyStatistics };
+    // "Mi Progreso" — evolución personal en el tiempo + comparación anónima
+    // contra el promedio de la cohorte (mismo rol).
+    const getMyProgress = async (req, res) => {
+        try {
+            const progress = await service.getMyProgress(req.user.id);
+            res.json({ success: true, progress });
+        } catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    };
+
+    return { create, getAll, getById, getMySurveys, update, remove, getStatistics, getMyStatistics, getMyProgress };
 };
 
 export default createSurveyController;

@@ -129,6 +129,104 @@ class SurveyService {
         };
     }
 
+    // Mi Progreso — línea de tiempo personal + promedio de la cohorte 
+    /**
+     * Combina el historial personal (para graficar la evolución en el tiempo)
+     * con el promedio agregado de todos los usuarios del mismo rol (cohorte),
+     * de forma 100% anónima: solo se exponen promedios/porcentajes agregados,
+     * nunca encuestas ni identidades de otros usuarios.
+     */
+    async getMyProgress(userId) {
+        const [personal, cohort] = await Promise.all([
+            this.getUserStatistics(userId),
+            this.repo.getStatistics(),
+        ]);
+
+        const surveys = personal.surveys || [];
+
+        // Línea de tiempo ordenada cronológicamente (más antigua primero)
+        const timeline = [...surveys]
+            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+            .map(s => this._toTimelinePoint(s));
+
+        const personalRecommendCount = surveys.filter(s => s.would_recommend).length;
+
+        const base = {
+            type: this.type,
+            personal: {
+                total_surveys: personal.total_surveys || 0,
+                first_survey_date: personal.first_survey_date,
+                last_survey_date: personal.last_survey_date,
+                unique_chatbots: personal.unique_chatbots || 0,
+                chatbots_usage: personal.chatbots_usage || {},
+                would_recommend_rate: surveys.length
+                    ? Math.round((personalRecommendCount / surveys.length) * 100)
+                    : null,
+            },
+            cohort: {
+                total_surveys: cohort.total_surveys || 0,
+            },
+            timeline,
+        };
+
+        if (this.type === 'student') {
+            base.personal.avg_usefulness = personal.avg_usefulness !== undefined
+                ? Number(personal.avg_usefulness) : null;
+            base.personal.avg_experience = personal.avg_experience !== undefined
+                ? Number(personal.avg_experience) : null;
+            base.cohort.avg_usefulness = cohort.avg_usefulness !== null ? Number(cohort.avg_usefulness) : null;
+            base.cohort.avg_experience = cohort.avg_experience !== null ? Number(cohort.avg_experience) : null;
+            base.cohort.would_recommend_rate = cohort.total_surveys
+                ? Math.round((cohort.would_recommend / cohort.total_surveys) * 100)
+                : null;
+        }
+
+        if (this.type === 'teacher') {
+            const personalLikelihoodScores = surveys
+                .map(s => this._likelihoodToScore(s.likelihood_future_use))
+                .filter(v => v !== null);
+            base.personal.avg_likelihood_score = personalLikelihoodScores.length
+                ? Number((personalLikelihoodScores.reduce((a, b) => a + b, 0) / personalLikelihoodScores.length).toFixed(2))
+                : null;
+
+            const cohortLikelihoodTotal = (cohort.very_likely_continue || 0)
+                + (cohort.likely_continue || 0) + (cohort.unlikely_continue || 0);
+            base.cohort.avg_likelihood_score = cohortLikelihoodTotal
+                ? Number((((cohort.very_likely_continue || 0) * 3
+                    + (cohort.likely_continue || 0) * 2
+                    + (cohort.unlikely_continue || 0) * 1) / cohortLikelihoodTotal).toFixed(2))
+                : null;
+            base.cohort.would_recommend_rate = cohort.total_surveys
+                ? Math.round((cohort.would_recommend_count / cohort.total_surveys) * 100)
+                : null;
+        }
+
+        return base;
+    }
+
+    // Convierte una encuesta cruda en un punto de la línea de tiempo,
+    // seleccionando solo los campos relevantes para graficar según el tipo.
+    _toTimelinePoint(survey) {
+        const point = {
+            date: survey.created_at,
+            would_recommend: survey.would_recommend,
+        };
+        if (this.type === 'student') {
+            point.usefulness_rating = survey.usefulness_rating;
+            point.overall_experience = survey.overall_experience;
+        }
+        if (this.type === 'teacher') {
+            point.likelihood_future_use = survey.likelihood_future_use;
+            point.likelihood_score = this._likelihoodToScore(survey.likelihood_future_use);
+        }
+        return point;
+    }
+
+    _likelihoodToScore(label) {
+        const map = { 'Muy probable': 3, 'Probable': 2, 'Imposible': 1 };
+        return map[label] ?? null;
+    }
+
     // Métodos específicos expuestos solo si el tipo los soporta 
 
     async getEnrichedStatistics() {
