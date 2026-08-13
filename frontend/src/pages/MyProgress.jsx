@@ -21,8 +21,14 @@ const MyProgress = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
+    // userIsStudent/userIsTeacher son funciones (ver AuthContext.jsx) — hay que
+    // invocarlas. Se resuelven una sola vez acá para no repetir la llamada
+    // en cada uso a lo largo del componente.
+    const userIsStudent = isStudent();
+    const userIsTeacher = isTeacher();
+
     useEffect(() => {
-        if (isStudent || isTeacher) {
+        if (userIsStudent || userIsTeacher) {
             loadProgress();
         } else {
             setLoading(false);
@@ -34,7 +40,7 @@ const MyProgress = () => {
         try {
             setLoading(true);
             setError('');
-            const service = isStudent ? surveyService.student : surveyService.teacher;
+            const service = userIsStudent ? surveyService.student : surveyService.teacher;
             const response = await service.getMyProgress();
             setProgress(response.progress);
         } catch (err) {
@@ -45,7 +51,7 @@ const MyProgress = () => {
     };
 
     // Admin no completa encuestas — no tiene progreso personal que mostrar
-    if (!isStudent && !isTeacher) {
+    if (!userIsStudent && !userIsTeacher) {
         return (
             <div>
                 <Header title="Mi Progreso" subtitle="Evolución personal de tus respuestas" />
@@ -88,7 +94,7 @@ const MyProgress = () => {
                         Todavía no completaste ninguna encuesta. Apenas envíes la primera,
                         vas a poder ver acá cómo evoluciona tu experiencia con el tiempo.
                     </p>
-                    <Link to={isStudent ? '/student-survey' : '/teacher-survey'}>
+                    <Link to={userIsStudent ? '/student-survey' : '/teacher-survey'}>
                         <Button>Completar mi primera encuesta</Button>
                     </Link>
                 </div>
@@ -102,7 +108,7 @@ const MyProgress = () => {
     let lineChartData;
     let metricTitle;
 
-    if (isStudent) {
+    if (userIsStudent) {
         metricTitle = 'Utilidad percibida (1-5)';
         lineChartData = {
             labels,
@@ -179,7 +185,7 @@ const MyProgress = () => {
         <div>
             <Header
                 title="Mi Progreso"
-                subtitle={`Tu evolución personal, comparada de forma anónima con el promedio de ${isStudent ? 'otros estudiantes' : 'otros docentes'}`}
+                subtitle={`Tu evolución personal, comparada de forma anónima con el promedio de ${userIsStudent ? 'otros estudiantes' : 'otros docentes'}`}
             />
 
             {/* Resumen rápido */}
@@ -217,8 +223,8 @@ const MyProgress = () => {
                     options={{
                         scales: {
                             y: {
-                                min: isStudent ? 1 : 1,
-                                max: isStudent ? 5 : 3,
+                                min: userIsStudent ? 1 : 1,
+                                max: userIsStudent ? 5 : 3,
                                 ticks: { stepSize: 1 },
                             },
                         },
@@ -230,7 +236,7 @@ const MyProgress = () => {
                     <p className="text-gray-600 text-sm">
                         Todavía tenés solo una encuesta registrada. Completá otra (podés hacer una
                         por día) para empezar a ver tu línea de evolución en el tiempo, comparada
-                        contra el promedio de {isStudent ? 'otros estudiantes' : 'otros docentes'}.
+                        contra el promedio de {userIsStudent ? 'otros estudiantes' : 'otros docentes'}.
                     </p>
                 </div>
             )}
@@ -250,7 +256,7 @@ const MyProgress = () => {
             )}
 
             <div className="mt-4 text-xs text-gray-400 text-center">
-                La comparación con "otros {isStudent ? 'estudiantes' : 'docentes'}" es siempre
+                La comparación con "otros {userIsStudent ? 'estudiantes' : 'docentes'}" es siempre
                 anónima y agregada — nunca se muestran encuestas ni identidades de otras personas.
             </div>
         </div>
