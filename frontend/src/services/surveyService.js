@@ -82,6 +82,16 @@ const surveyService = {
                 throw error.response?.data || error;
             }
         },
+
+        // Obtener mi progreso (línea de tiempo personal + promedio de la cohorte)
+        getMyProgress: async () => {
+            try {
+                const response = await api.get('/student-surveys/my-progress');
+                return response.data;
+            } catch (error) {
+                throw error.response?.data || error;
+            }
+        },
     },
 
     // ========== ENCUESTAS DE PROFESORES ==========
@@ -160,6 +170,16 @@ const surveyService = {
         getMyStatistics: async () => {
             try {
                 const response = await api.get('/teacher-surveys/my-statistics');
+                return response.data;
+            } catch (error) {
+                throw error.response?.data || error;
+            }
+        },
+
+        // Obtener mi progreso (línea de tiempo personal + promedio de la cohorte)
+        getMyProgress: async () => {
+            try {
+                const response = await api.get('/teacher-surveys/my-progress');
                 return response.data;
             } catch (error) {
                 throw error.response?.data || error;

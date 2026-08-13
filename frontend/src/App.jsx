@@ -14,6 +14,7 @@ import AdminPanel from './pages/AdminPanel';
 import StudentSurvey from './pages/StudentSurvey';
 import TeacherSurvey from './pages/TeacherSurvey';
 import MySurveys from './pages/MySurveys';
+import MyProgress from './pages/MyProgress';
 import Profile from './pages/Profile';
 import Statistics from './pages/Statistics';
 import Settings from './pages/Settings';
@@ -88,6 +89,15 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <MySurveys />
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="my-progress"
+                  element={
+                    <ProtectedRoute>
+                      <MyProgress />
                     </ProtectedRoute>
                   }
                 />

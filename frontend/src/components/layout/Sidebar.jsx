@@ -7,7 +7,8 @@ import {
     Settings,
     X,
     ClipboardList,
-    BookOpen
+    BookOpen,
+    TrendingUp
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -41,6 +42,12 @@ const Sidebar = ({ isOpen, onClose }) => {
             icon: FileText,
             label: 'Mis Encuestas',
             roles: ['student', 'teacher', 'admin']
+        },
+        {
+            path: '/my-progress',
+            icon: TrendingUp,
+            label: 'Mi Progreso',
+            roles: ['student', 'teacher']
         },
         {
             path: '/statistics',
