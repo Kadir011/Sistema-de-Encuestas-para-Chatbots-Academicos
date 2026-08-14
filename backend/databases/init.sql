@@ -79,3 +79,27 @@ CREATE INDEX IF NOT EXISTS idx_teacher_surveys_created_at ON teacher_surveys (cr
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_teacher_survey_user_day
     ON teacher_surveys (user_id, survey_date);
+
+-- ─── ai_insights ────────────────────────────────────────────────────────────
+-- Un análisis personalizado por usuario, generado con IA a partir de su
+-- propio historial de encuestas. Se recalcula (upsert) cada vez que el
+-- usuario envía una encuesta nueva; no guarda histórico, solo el más
+-- reciente. 100% opt-in en cuanto a datos: solo se envían al modelo las
+-- respuestas del propio usuario, nunca username/email ni datos de terceros.
+CREATE TABLE IF NOT EXISTS ai_insights (
+    id                   SERIAL PRIMARY KEY,
+    user_id              INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    survey_type          VARCHAR(20) NOT NULL CHECK (survey_type IN ('student', 'teacher')),
+    status               VARCHAR(20) NOT NULL DEFAULT 'pending'
+                         CHECK (status IN ('pending', 'ready', 'failed')),
+    summary              TEXT,
+    recommendations      TEXT[] DEFAULT '{}',
+    error_message        TEXT,
+    source_survey_id     INTEGER,
+    model                VARCHAR(50),
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Un solo insight "vivo" por usuario (se actualiza in-place, no se acumula)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_insights_user ON ai_insights (user_id);
