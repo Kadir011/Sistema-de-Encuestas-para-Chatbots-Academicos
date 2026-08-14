@@ -40,6 +40,14 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GE
 const REQUEST_TIMEOUT_MS = 20000;
 const MAX_SURVEYS_IN_PROMPT = 10; // acota tokens/costo; alcanza para detectar patrones
 
+// Reintentos solo para errores transitorios del lado de Google (capa
+// gratuita: es común recibir 503 "high demand" o 429 "quota" momentáneos).
+// Un 404 (modelo inexistente) o 400 (request mal formado) NO se reintenta:
+// reintentar no lo va a arreglar, solo gasta cuota gratuita para nada.
+const MAX_ATTEMPTS = 3; // intento inicial + 2 reintentos
+const RETRYABLE_STATUS = new Set([429, 503]);
+const RETRY_DELAYS_MS = [1500, 3000];
+
 // Esquema de salida estructurada — evita depender de parsear texto libre.
 const RESPONSE_SCHEMA = {
     type: 'OBJECT',
@@ -95,8 +103,9 @@ class AIInsightService {
                 model: GEMINI_MODEL,
             });
         } catch (error) {
-            console.error('[AIInsightService] Error generando insight:', error.message);
-            await AIInsight.markFailed(userId, error.message).catch(() => {});
+            const message = `[${GEMINI_MODEL}] ${error.message}`;
+            console.error('[AIInsightService] Error generando insight:', message);
+            await AIInsight.markFailed(userId, message).catch(() => {});
         }
     }
 
@@ -153,53 +162,79 @@ class AIInsightService {
         return instructions;
     }
 
-    // ── Llamada al proveedor (Gemini, capa gratuita) ────────────────────────
+    // ── Llamada al proveedor (Gemini, capa gratuita), con reintentos ────────
+    // ante errores transitorios (503/429). Un 404/400 falla en el primer
+    // intento sin reintentar.
     static async _callProvider(prompt, apiKey) {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        let lastError;
 
-        try {
-            const response = await fetch(GEMINI_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-goog-api-key': apiKey,
-                },
-                signal: controller.signal,
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        responseMimeType: 'application/json',
-                        responseSchema: RESPONSE_SCHEMA,
-                        temperature: 0.6,
-                        maxOutputTokens: 500,
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+            try {
+                const response = await fetch(GEMINI_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-goog-api-key': apiKey,
                     },
-                }),
-            });
+                    signal: controller.signal,
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            responseMimeType: 'application/json',
+                            responseSchema: RESPONSE_SCHEMA,
+                            temperature: 0.6,
+                            maxOutputTokens: 500,
+                        },
+                    }),
+                });
 
-            if (!response.ok) {
-                const errBody = await response.text().catch(() => '');
-                throw new Error(`Gemini respondió ${response.status}: ${errBody.slice(0, 300)}`);
+                if (!response.ok) {
+                    const errBody = await response.text().catch(() => '');
+                    const error = new Error(`Gemini respondió ${response.status}: ${errBody.slice(0, 300)}`);
+                    error.status = response.status;
+                    throw error;
+                }
+
+                const data = await response.json();
+                const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!text) {
+                    throw new Error('Respuesta de Gemini sin contenido utilizable');
+                }
+
+                const parsed = JSON.parse(text);
+                if (!parsed.summary || !Array.isArray(parsed.recommendations)) {
+                    throw new Error('Respuesta de Gemini con forma inesperada');
+                }
+
+                return {
+                    summary: String(parsed.summary).trim(),
+                    recommendations: parsed.recommendations.map(r => String(r).trim()).slice(0, 3),
+                };
+            } catch (error) {
+                lastError = error;
+                const isRetryable = RETRYABLE_STATUS.has(error.status);
+                const hasMoreAttempts = attempt < MAX_ATTEMPTS;
+
+                if (isRetryable && hasMoreAttempts) {
+                    const delay = RETRY_DELAYS_MS[attempt - 1] ?? 3000;
+                    console.warn(
+                        `[AIInsightService] Intento ${attempt}/${MAX_ATTEMPTS} falló ` +
+                        `(HTTP ${error.status}), reintentando en ${delay}ms...`
+                    );
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    continue;
+                }
+
+                throw lastError;
+            } finally {
+                clearTimeout(timeout);
             }
-
-            const data = await response.json();
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!text) {
-                throw new Error('Respuesta de Gemini sin contenido utilizable');
-            }
-
-            const parsed = JSON.parse(text);
-            if (!parsed.summary || !Array.isArray(parsed.recommendations)) {
-                throw new Error('Respuesta de Gemini con forma inesperada');
-            }
-
-            return {
-                summary: String(parsed.summary).trim(),
-                recommendations: parsed.recommendations.map(r => String(r).trim()).slice(0, 3),
-            };
-        } finally {
-            clearTimeout(timeout);
         }
+
+        throw lastError;
     }
 }
 
