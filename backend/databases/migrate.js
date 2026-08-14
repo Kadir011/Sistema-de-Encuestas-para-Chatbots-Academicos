@@ -23,7 +23,7 @@ const migrate = async () => {
     try {
         const sql = readFileSync(join(__dirname, 'init.sql'), 'utf-8');
         await pool.query(sql);
-        console.log('✓ Esquema aplicado correctamente (users, student_surveys, teacher_surveys).');
+        console.log('✓ Esquema aplicado correctamente.');
     } catch (error) {
         console.error('Error al aplicar el esquema:', error.message);
         process.exitCode = 1;
