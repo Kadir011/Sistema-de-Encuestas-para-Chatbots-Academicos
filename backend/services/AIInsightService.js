@@ -28,7 +28,14 @@
 import { SurveyRepositoryFactory } from '../repositories/SurveyRepository.js';
 import AIInsight from '../models/AIInsight.js';
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
+// gemini-3.1-flash-lite: modelo GA (estable), capa gratuita, soporta salida
+// estructurada (responseSchema) y sin fecha de retiro anunciada al momento
+// de escribir esto. Evitar "gemini-2.5-flash": Google lo está retirando
+// activamente y hay reportes de fallos antes de su fecha oficial de baja.
+// Si en el futuro este modelo también se deprecara, cambiarlo acá es el
+// único lugar que hay que tocar — correr scripts/check-gemini.py primero
+// para confirmar qué modelos están disponibles con tu API key.
+const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const REQUEST_TIMEOUT_MS = 20000;
 const MAX_SURVEYS_IN_PROMPT = 10; // acota tokens/costo; alcanza para detectar patrones
