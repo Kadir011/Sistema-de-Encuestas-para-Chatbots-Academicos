@@ -21,6 +21,7 @@ router.get('/my-surveys', verifyTeacher, ctrl.getMySurveys);
 router.get('/statistics', ctrl.getStatistics);
 router.get('/my-statistics', ctrl.getMyStatistics);
 router.get('/my-progress', verifyTeacher, ctrl.getMyProgress);
+router.get('/my-insight', verifyTeacher, ctrl.getMyInsight);
 router.get('/:id', ctrl.getById);
 router.put('/:id', sanitizeInput, validateTeacherSurvey, ctrl.update);
 router.delete('/:id', ctrl.remove);

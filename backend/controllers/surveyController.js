@@ -12,6 +12,7 @@
  */
 
 import { SurveyServiceFactory } from '../services/SurveyService.js';
+import AIInsight from '../models/AIInsight.js';
 
 /**
  * Crea un conjunto de handlers para un tipo de encuesta dado.
@@ -109,7 +110,25 @@ const createSurveyController = (type) => {
         }
     };
 
-    return { create, getAll, getById, getMySurveys, update, remove, getStatistics, getMyStatistics, getMyProgress };
+    // "Mi Insight" — análisis personalizado generado con IA a partir del
+    // propio historial. Solo lectura: la generación la dispara el listener
+    // de Observer al crear una encuesta (ver domainEventListeners.js).
+    const getMyInsight = async (req, res) => {
+        try {
+            const insight = await AIInsight.findByUserId(req.user.id);
+            if (!insight) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Todavía no se generó ningún análisis. Completá una encuesta para recibir uno.',
+                });
+            }
+            res.json({ success: true, insight });
+        } catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    };
+
+    return { create, getAll, getById, getMySurveys, update, remove, getStatistics, getMyStatistics, getMyProgress, getMyInsight };
 };
 
 export default createSurveyController;

@@ -14,6 +14,8 @@
  */
 
 import eventBus, { DOMAIN_EVENTS } from '../services/EventEmitterService.js';
+import AIInsightService from '../services/AIInsightService.js';
+import AIInsight from '../models/AIInsight.js';
 
 // ─── Listener de auditoría / logging ─────────────────────────────────────────
 const AuditListener = {
@@ -52,6 +54,25 @@ const MetricsListener = {
     getSnapshot() { return { ...this.counters }; },
 };
 
+// ─── Listener de Insights de IA ─────────────────────────────────────────────
+// Se dispara al crear una encuesta (estudiante o docente). Marca el insight
+// como "pendiente" y dispara la generación con IA de forma fire-and-forget:
+// nunca se espera (await) desde acá, por lo que jamás retrasa ni puede
+// hacer fallar la respuesta HTTP del submit de la encuesta.
+const InsightListener = {
+    async onSurveyCreated({ name, payload }) {
+        const surveyType = name === DOMAIN_EVENTS.STUDENT_SURVEY_CREATED ? 'student' : 'teacher';
+        try {
+            await AIInsight.markPending(payload.userId, surveyType, payload.surveyId);
+        } catch (error) {
+            console.error('[InsightListener] No se pudo marcar el insight como pendiente:', error.message);
+            return;
+        }
+        // No se hace await a propósito: corre en background.
+        AIInsightService.generateForUser(payload.userId, surveyType);
+    },
+};
+
 // ─── Registro de todos los listeners ─────────────────────────────────────────
 export const registerAllListeners = () => {
     // Usuarios
@@ -61,11 +82,11 @@ export const registerAllListeners = () => {
     eventBus.subscribe(DOMAIN_EVENTS.USER_PASSWORD_CHANGED, (e) => AuditListener.onPasswordChanged(e));
 
     // Encuestas de estudiantes
-    eventBus.subscribe(DOMAIN_EVENTS.STUDENT_SURVEY_CREATED, (e) => { AuditListener.onSurveyCreated(e); MetricsListener.onSurveyCreated(); });
+    eventBus.subscribe(DOMAIN_EVENTS.STUDENT_SURVEY_CREATED, (e) => { AuditListener.onSurveyCreated(e); MetricsListener.onSurveyCreated(); InsightListener.onSurveyCreated(e); });
     eventBus.subscribe(DOMAIN_EVENTS.STUDENT_SURVEY_DELETED, (e) => { AuditListener.onSurveyDeleted(e); MetricsListener.onSurveyDeleted(); });
 
     // Encuestas de profesores
-    eventBus.subscribe(DOMAIN_EVENTS.TEACHER_SURVEY_CREATED, (e) => { AuditListener.onSurveyCreated(e); MetricsListener.onSurveyCreated(); });
+    eventBus.subscribe(DOMAIN_EVENTS.TEACHER_SURVEY_CREATED, (e) => { AuditListener.onSurveyCreated(e); MetricsListener.onSurveyCreated(); InsightListener.onSurveyCreated(e); });
     eventBus.subscribe(DOMAIN_EVENTS.TEACHER_SURVEY_DELETED, (e) => { AuditListener.onSurveyDeleted(e); MetricsListener.onSurveyDeleted(); });
 
     if (process.env.NODE_ENV === 'development') {
