@@ -92,6 +92,16 @@ const surveyService = {
                 throw error.response?.data || error;
             }
         },
+
+        // Obtener mi análisis personalizado generado con IA
+        getMyInsight: async () => {
+            try {
+                const response = await api.get('/student-surveys/my-insight');
+                return response.data;
+            } catch (error) {
+                throw error.response?.data || error;
+            }
+        },
     },
 
     // ========== ENCUESTAS DE PROFESORES ==========
@@ -180,6 +190,16 @@ const surveyService = {
         getMyProgress: async () => {
             try {
                 const response = await api.get('/teacher-surveys/my-progress');
+                return response.data;
+            } catch (error) {
+                throw error.response?.data || error;
+            }
+        },
+
+        // Obtener mi análisis personalizado generado con IA
+        getMyInsight: async () => {
+            try {
+                const response = await api.get('/teacher-surveys/my-insight');
                 return response.data;
             } catch (error) {
                 throw error.response?.data || error;

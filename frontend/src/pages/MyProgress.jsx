@@ -5,6 +5,7 @@ import surveyService from '../services/surveyService';
 import Header from '../components/layout/Header';
 import Chart from '../components/dashboard/Chart';
 import StatsCard from '../components/dashboard/StatsCard';
+import AIInsightCard from '../components/dashboard/AIInsightCard';
 import Loading from '../components/common/Loading';
 import Alert from '../components/common/Alert';
 import Button from '../components/common/Button';
@@ -187,6 +188,9 @@ const MyProgress = () => {
                 title="Mi Progreso"
                 subtitle={`Tu evolución personal, comparada de forma anónima con el promedio de ${userIsStudent ? 'otros estudiantes' : 'otros docentes'}`}
             />
+
+            {/* Análisis personalizado generado con IA */}
+            <AIInsightCard surveyType={userIsStudent ? 'student' : 'teacher'} />
 
             {/* Resumen rápido */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
